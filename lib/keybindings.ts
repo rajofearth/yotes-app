@@ -99,6 +99,14 @@ export const keybindings: KeybindingDefinition[] = [
     options: { key: "l", metaKey: true, ctrlKey: true },
     display: "⌘L",
   },
+  // View
+  {
+    id: "toggle-sidebar",
+    label: "Toggle Sidebar",
+    category: "View",
+    options: { key: "b", metaKey: true, ctrlKey: true },
+    display: "⌘B",
+  },
   // Settings
   {
     id: "toggle-theme",
