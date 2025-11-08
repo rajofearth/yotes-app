@@ -16,17 +16,16 @@ import {
   
   export function HomeMenubar() {
     return (
-      <Menubar>
+      <Menubar className="border-0"> 
         <MenubarMenu>
           <MenubarTrigger>File</MenubarTrigger>
           <MenubarContent>
             <MenubarItem>
-              New Tab <MenubarShortcut>⌘T</MenubarShortcut>
+              New Note <MenubarShortcut>⌘T</MenubarShortcut>
             </MenubarItem>
             <MenubarItem>
               New Window <MenubarShortcut>⌘N</MenubarShortcut>
             </MenubarItem>
-            <MenubarItem disabled>New Incognito Window</MenubarItem>
             <MenubarSeparator />
             <MenubarSub>
               <MenubarSubTrigger>Share</MenubarSubTrigger>
@@ -75,13 +74,6 @@ import {
             <MenubarCheckboxItem checked>
               Always Show Full URLs
             </MenubarCheckboxItem>
-            <MenubarSeparator />
-            <MenubarItem inset>
-              Reload <MenubarShortcut>⌘R</MenubarShortcut>
-            </MenubarItem>
-            <MenubarItem disabled inset>
-              Force Reload <MenubarShortcut>⇧⌘R</MenubarShortcut>
-            </MenubarItem>
             <MenubarSeparator />
             <MenubarItem inset>Toggle Fullscreen</MenubarItem>
             <MenubarSeparator />
