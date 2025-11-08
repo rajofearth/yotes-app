@@ -4,8 +4,6 @@ import {
     MenubarContent,
     MenubarItem,
     MenubarMenu,
-    MenubarRadioGroup,
-    MenubarRadioItem,
     MenubarSeparator,
     MenubarShortcut,
     MenubarSub,
@@ -13,7 +11,7 @@ import {
     MenubarSubTrigger,
     MenubarTrigger,
   } from "@/components/ui/menubar"
-  
+import { CloudCheck, User, LogOut } from "lucide-react"
   export function HomeMenubar() {
     return (
       <Menubar className="border-0"> 
@@ -54,17 +52,17 @@ import {
             <MenubarSub>
               <MenubarSubTrigger>Find</MenubarSubTrigger>
               <MenubarSubContent>
-                <MenubarItem>Search the web</MenubarItem>
+                <MenubarItem>Search the web <MenubarShortcut>⌘L</MenubarShortcut></MenubarItem>
                 <MenubarSeparator />
-                <MenubarItem>Find...</MenubarItem>
-                <MenubarItem>Find Next</MenubarItem>
-                <MenubarItem>Find Previous</MenubarItem>
+                <MenubarItem>Find... <MenubarShortcut>⌘F</MenubarShortcut></MenubarItem>
+                <MenubarItem>Find Next <MenubarShortcut>⌘G</MenubarShortcut></MenubarItem>
+                <MenubarItem>Find Previous <MenubarShortcut>⇧⌘G</MenubarShortcut></MenubarItem>
               </MenubarSubContent>
             </MenubarSub>
             <MenubarSeparator />
-            <MenubarItem>Cut</MenubarItem>
-            <MenubarItem>Copy</MenubarItem>
-            <MenubarItem>Paste</MenubarItem>
+            <MenubarItem>Cut <MenubarShortcut>⌘X</MenubarShortcut></MenubarItem>
+            <MenubarItem>Copy <MenubarShortcut>⌘C</MenubarShortcut></MenubarItem>
+            <MenubarItem>Paste <MenubarShortcut>⌘V</MenubarShortcut></MenubarItem>
           </MenubarContent>
         </MenubarMenu>
         <MenubarMenu>
@@ -81,17 +79,14 @@ import {
           </MenubarContent>
         </MenubarMenu>
         <MenubarMenu>
-          <MenubarTrigger>Profiles</MenubarTrigger>
+          <MenubarTrigger>Settings</MenubarTrigger>
           <MenubarContent>
-            <MenubarRadioGroup value="benoit">
-              <MenubarRadioItem value="andy">Andy</MenubarRadioItem>
-              <MenubarRadioItem value="benoit">Benoit</MenubarRadioItem>
-              <MenubarRadioItem value="Luis">Luis</MenubarRadioItem>
-            </MenubarRadioGroup>
+            <MenubarItem>
+              <CloudCheck/>
+              Backup Notes</MenubarItem>
             <MenubarSeparator />
-            <MenubarItem inset>Edit...</MenubarItem>
-            <MenubarSeparator />
-            <MenubarItem inset>Add Profile...</MenubarItem>
+            <MenubarItem> <User/> Profile</MenubarItem>
+            <MenubarItem> <LogOut/> Logout</MenubarItem>
           </MenubarContent>
         </MenubarMenu>
       </Menubar>
