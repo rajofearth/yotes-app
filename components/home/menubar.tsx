@@ -13,14 +13,18 @@ import {
     MenubarSubTrigger,
     MenubarTrigger,
   } from "@/components/ui/menubar"
-import { CloudCheck, User, LogOut, SunMoon } from "lucide-react"
+import { CloudCheck, User, LogOut, SunMoon, Keyboard } from "lucide-react"
 import { useThemeToggle } from "@/hooks/use-theme-toggle"
+import { useKeybindingsDialog } from "@/hooks/use-keybindings-dialog"
+import { KeybindingsDialog } from "@/components/keybindings-dialog"
 
 export function HomeMenubar() {
   const { toggleTheme } = useThemeToggle();
+  const { open, setOpen } = useKeybindingsDialog();
 
   return (
-    <Menubar className="border-0"> 
+    <>
+      <Menubar className="border-0"> 
       <MenubarMenu>
         <MenubarTrigger>File</MenubarTrigger>
         <MenubarContent>
@@ -93,7 +97,8 @@ export function HomeMenubar() {
           <MenubarItem onClick={toggleTheme}>
             <SunMoon/>Toggle Theme <MenubarShortcut>⌘T</MenubarShortcut>
           </MenubarItem>
-          <MenubarItem>
+          <MenubarItem onClick={() => setOpen(true)}>
+            <Keyboard />
             Keybindings <MenubarShortcut>⌘K</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
@@ -102,6 +107,8 @@ export function HomeMenubar() {
         </MenubarContent>
       </MenubarMenu>
     </Menubar>
+    <KeybindingsDialog open={open} onOpenChange={setOpen} />
+    </>
   )
 }
   
