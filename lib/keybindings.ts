@@ -18,8 +18,8 @@ export const keybindings: KeybindingDefinition[] = [
     id: "new-note",
     label: "New Note",
     category: "File",
-    options: { key: "n", metaKey: true, ctrlKey: true },
-    display: "⌘N",
+    options: { key: "n", altKey: true },
+    display: "⌥N",
   },
   {
     id: "new-window",
@@ -96,8 +96,8 @@ export const keybindings: KeybindingDefinition[] = [
     id: "search-web",
     label: "Search the web",
     category: "Edit",
-    options: { key: "l", metaKey: true, ctrlKey: true },
-    display: "⌘L",
+    options: { key: "l", altKey: true },
+    display: "⌥L",
   },
   // View
   {
@@ -112,8 +112,8 @@ export const keybindings: KeybindingDefinition[] = [
     id: "toggle-theme",
     label: "Toggle Theme",
     category: "Settings",
-    options: { key: "t", metaKey: true, ctrlKey: true },
-    display: "⌘T",
+    options: { key: "t", altKey: true },
+    display: "⌥T",
   },
   {
     id: "keybindings",

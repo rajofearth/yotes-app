@@ -33,7 +33,7 @@ export function HomeMenubar({ onCreateNote }: HomeMenubarProps) {
           <MenubarTrigger>File</MenubarTrigger>
           <MenubarContent>
             <MenubarItem onClick={onCreateNote}>
-              New Note <MenubarShortcut>⌘N</MenubarShortcut>
+              New Note <MenubarShortcut>⌥N</MenubarShortcut>
             </MenubarItem>
             <MenubarItem>
               New Window <MenubarShortcut>⌘W</MenubarShortcut>
@@ -67,7 +67,7 @@ export function HomeMenubar({ onCreateNote }: HomeMenubarProps) {
               <MenubarSubTrigger>Find</MenubarSubTrigger>
               <MenubarSubContent>
                 <MenubarItem>
-                  Search the web <MenubarShortcut>⌘L</MenubarShortcut>
+                  Search the web <MenubarShortcut>⌥L</MenubarShortcut>
                 </MenubarItem>
                 <MenubarSeparator />
                 <MenubarItem>
@@ -115,7 +115,7 @@ export function HomeMenubar({ onCreateNote }: HomeMenubarProps) {
             </MenubarItem>
             <MenubarItem onClick={toggleTheme}>
               <SunMoon />
-              Toggle Theme <MenubarShortcut>⌘T</MenubarShortcut>
+              Toggle Theme <MenubarShortcut>⌥T</MenubarShortcut>
             </MenubarItem>
             <MenubarItem onClick={() => setOpen(true)}>
               <Keyboard />

@@ -4,7 +4,7 @@ import { useKeybinding } from "./use-keybinding";
 import { getKeybinding } from "@/lib/keybindings";
 
 /**
- * Hook for handling the "New Note" keyboard shortcut (⌘N / Ctrl+N).
+ * Hook for handling the "New Note" keyboard shortcut (⌘⇧N / Ctrl+Shift+N).
  * Automatically uses the keybinding configuration from keybindings.ts.
  *
  * @param onCreateNote - Function to call when the new note shortcut is triggered

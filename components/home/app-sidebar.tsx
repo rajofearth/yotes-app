@@ -1,6 +1,6 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -31,23 +31,103 @@ export function AppSidebar({
   selectedNoteId,
   ...props
 }: AppSidebarProps) {
-  const handleNoteClick = (
-    e: React.MouseEvent<HTMLButtonElement>,
-    note: Note,
-  ) => {
-    e.preventDefault();
-    onNoteSelect?.(note);
-  };
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const deferredSearch = React.useDeferredValue(searchQuery);
+  const normalizedQuery = React.useMemo(
+    () => deferredSearch.trim().toLowerCase(),
+    [deferredSearch],
+  );
+
+  const handleSearchChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(event.target.value);
+    },
+    [],
+  );
+
+  const handleSearchKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Escape" && searchQuery) {
+        event.preventDefault();
+        setSearchQuery("");
+      }
+    },
+    [searchQuery],
+  );
+
+  const handleClearSearch = React.useCallback(() => {
+    setSearchQuery("");
+  }, []);
+
+  const filteredNotes = React.useMemo(() => {
+    if (!normalizedQuery) {
+      return notes;
+    }
+
+    return notes.filter((note) => {
+      const title = getNoteTitle(note.content).toLowerCase();
+      const content = note.content.toLowerCase();
+      return (
+        title.includes(normalizedQuery) || content.includes(normalizedQuery)
+      );
+    });
+  }, [normalizedQuery, notes]);
+
+  const handleNoteClick = React.useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>, note: Note) => {
+      event.preventDefault();
+      onNoteSelect?.(note);
+    },
+    [onNoteSelect],
+  );
+
+  const hasNotes = notes.length > 0;
+  const hasResults = filteredNotes.length > 0;
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader className="gap-3.5 border-b p-2.5">
-        <SidebarInput placeholder="Type to search..." />
+        <div className="relative flex items-center">
+          <SidebarInput
+            value={searchQuery}
+            onChange={handleSearchChange}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Search notes..."
+            aria-label="Search notes"
+            autoComplete="off"
+            spellCheck={false}
+            className="pr-8"
+          />
+          {searchQuery ? (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              className="absolute right-2 text-muted-foreground/80 transition hover:text-muted-foreground"
+              aria-label="Clear search"
+            >
+              <svg
+                className="size-4"
+                viewBox="0 0 20 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+              >
+                <path
+                  d="M6 6l8 8m0-8l-8 8"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          ) : null}
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup className="px-0">
           <SidebarGroupContent>
-            {notes.length === 0 ? (
+            {!hasNotes ? (
               <Empty className="border-dashed border-0">
                 <EmptyMedia>
                   <svg
@@ -69,10 +149,38 @@ export function AppSidebar({
                   Create your first note to get started.
                 </EmptyDescription>
               </Empty>
+            ) : !hasResults ? (
+              <Empty className="border-dashed border-0">
+                <EmptyMedia>
+                  <svg
+                    className="size-12 text-muted-foreground/50"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M19.5 19.5l-2.475-2.475M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </EmptyMedia>
+                <EmptyTitle>No matches found</EmptyTitle>
+                <EmptyDescription>
+                  No notes match <span className="font-medium">&ldquo;{searchQuery}&rdquo;</span>. Try a different keyword.
+                </EmptyDescription>
+              </Empty>
             ) : (
-              notes.map((note) => {
+              filteredNotes.map((note) => {
                 const title = getNoteTitle(note.content);
-                const date = formatNoteDate(note.createdAt);
+                const date = formatNoteDate(note.updatedAt);
                 const isActive = selectedNoteId === note.id;
                 return (
                   <button
