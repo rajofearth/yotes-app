@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppSidebar } from "@/components/home/app-sidebar";
 import { HomeMenubar } from "@/components/home/menubar";
 import { Separator } from "@/components/ui/separator";
@@ -10,29 +10,38 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
-import { initialNotes } from "@/lib/data";
 import type { Note } from "@/lib/types";
+import { getAllNotes, getNote } from "@/lib/indexdb";
 
 export default function Home() {
-  const [notes, setNotes] = useState<Note[]>(initialNotes);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const notesMap = useMemo(
-    () => new Map(notes.map((note) => [note.id, note])),
-    [notes],
-  );
+  // Load notes on component mount
+  useEffect(() => {
+    const loadNotes = async () => {
+      try {
+        const allNotes = await getAllNotes();
+        setNotes(allNotes);
+      } catch (error) {
+        console.error('Failed to load notes:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const selectedNote = useMemo(
-    () => (selectedNoteId ? notesMap.get(selectedNoteId) : undefined),
-    [notesMap, selectedNoteId],
-  );
+    loadNotes();
+  }, []);
 
-  const handleNoteSelect = (note: Note) => {
+  const handleNoteSelect = async (note: Note) => {
     setSelectedNoteId(note.id);
+    setSelectedNote(await getNote(note.id));
   };
 
   const handleContentChange = (content: string) => {
-    if (!selectedNoteId) return;
+    if (!selectedNote) return;
 
     setNotes((prevNotes) =>
       prevNotes.map((note) =>
@@ -44,7 +53,7 @@ export default function Home() {
   return (
     <SidebarProvider>
       <AppSidebar
-        notes={notes}
+        notes={isLoading ? [] : notes}
         onNoteSelect={handleNoteSelect}
         selectedNoteId={selectedNoteId || undefined}
       />
@@ -58,13 +67,21 @@ export default function Home() {
           <HomeMenubar />
         </header>
         <div className="flex flex-1 flex-col p-4">
-          {selectedNote && (
+          {isLoading ? (
+            <div className="flex items-center justify-center flex-1">
+              <div className="text-muted-foreground">Loading notes...</div>
+            </div>
+          ) : selectedNote ? (
             <Textarea
               value={selectedNote.content}
               onChange={(e) => handleContentChange(e.target.value)}
               className="flex-1 min-h-[400px] resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent"
               placeholder="Start typing..."
             />
+          ) : (
+            <div className="flex items-center justify-center flex-1">
+              <div className="text-muted-foreground">Select a note to start editing</div>
+            </div>
           )}
         </div>
       </SidebarInset>
