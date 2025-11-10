@@ -127,7 +127,10 @@ export const keybindings: KeybindingDefinition[] = [
 /**
  * Get keybindings grouped by category
  */
-export function getKeybindingsByCategory(): Record<string, KeybindingDefinition[]> {
+export function getKeybindingsByCategory(): Record<
+  string,
+  KeybindingDefinition[]
+> {
   return keybindings.reduce(
     (acc, binding) => {
       if (!acc[binding.category]) {
@@ -146,4 +149,3 @@ export function getKeybindingsByCategory(): Record<string, KeybindingDefinition[
 export function getKeybinding(id: string): KeybindingDefinition | undefined {
   return keybindings.find((binding) => binding.id === id);
 }
-

@@ -1,6 +1,5 @@
 export type Note = {
-  id: string
-  content: string
-  createdAt: Date
-}
-
+  id: string;
+  content: string;
+  createdAt: Date;
+};

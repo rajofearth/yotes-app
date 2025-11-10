@@ -1,45 +1,45 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import { AppSidebar } from "@/components/home/app-sidebar"
-import { HomeMenubar } from "@/components/home/menubar"
-import { Separator } from "@/components/ui/separator"
+import { useMemo, useState } from "react";
+import { AppSidebar } from "@/components/home/app-sidebar";
+import { HomeMenubar } from "@/components/home/menubar";
+import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Textarea } from "@/components/ui/textarea"
-import { initialNotes } from "@/lib/data"
-import type { Note } from "@/lib/types"
+} from "@/components/ui/sidebar";
+import { Textarea } from "@/components/ui/textarea";
+import { initialNotes } from "@/lib/data";
+import type { Note } from "@/lib/types";
 
 export default function Home() {
-  const [notes, setNotes] = useState<Note[]>(initialNotes)
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
+  const [notes, setNotes] = useState<Note[]>(initialNotes);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
   const notesMap = useMemo(
     () => new Map(notes.map((note) => [note.id, note])),
-    [notes]
-  )
+    [notes],
+  );
 
   const selectedNote = useMemo(
     () => (selectedNoteId ? notesMap.get(selectedNoteId) : undefined),
-    [notesMap, selectedNoteId]
-  )
+    [notesMap, selectedNoteId],
+  );
 
   const handleNoteSelect = (note: Note) => {
-    setSelectedNoteId(note.id)
-  }
+    setSelectedNoteId(note.id);
+  };
 
   const handleContentChange = (content: string) => {
-    if (!selectedNoteId) return
+    if (!selectedNoteId) return;
 
     setNotes((prevNotes) =>
       prevNotes.map((note) =>
-        note.id === selectedNoteId ? { ...note, content } : note
-      )
-    )
-  }
+        note.id === selectedNoteId ? { ...note, content } : note,
+      ),
+    );
+  };
 
   return (
     <SidebarProvider>
@@ -69,5 +69,5 @@ export default function Home() {
         </div>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }

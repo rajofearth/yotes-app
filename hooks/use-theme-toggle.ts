@@ -20,12 +20,7 @@ import { useKeybinding } from "./use-keybinding";
  * );
  * ```
  */
-export function useThemeToggle(
-  options?: {
-    key?: string;
-    enabled?: boolean;
-  },
-) {
+export function useThemeToggle(options?: { key?: string; enabled?: boolean }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   const toggleTheme = () => {
@@ -55,4 +50,3 @@ export function useThemeToggle(
     setTheme,
   };
 }
-
