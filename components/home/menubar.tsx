@@ -18,7 +18,11 @@ import {
 import { useKeybindingsDialog } from "@/hooks/use-keybindings-dialog";
 import { useThemeToggle } from "@/hooks/use-theme-toggle";
 
-export function HomeMenubar() {
+interface HomeMenubarProps {
+  onCreateNote?: () => void;
+}
+
+export function HomeMenubar({ onCreateNote }: HomeMenubarProps) {
   const { toggleTheme } = useThemeToggle();
   const { open, setOpen } = useKeybindingsDialog();
 
@@ -28,11 +32,11 @@ export function HomeMenubar() {
         <MenubarMenu>
           <MenubarTrigger>File</MenubarTrigger>
           <MenubarContent>
-            <MenubarItem>
-              New Note <MenubarShortcut>⌘T</MenubarShortcut>
+            <MenubarItem onClick={onCreateNote}>
+              New Note <MenubarShortcut>⌘N</MenubarShortcut>
             </MenubarItem>
             <MenubarItem>
-              New Window <MenubarShortcut>⌘N</MenubarShortcut>
+              New Window <MenubarShortcut>⌘W</MenubarShortcut>
             </MenubarItem>
             <MenubarSeparator />
             <MenubarSub>

@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import type { Note } from "@/lib/types";
-import { getAllNotes, getNote } from "@/lib/indexdb";
+import { getAllNotes, getNote, createNote, updateNote } from "@/lib/indexdb";
+import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
 
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -40,15 +41,39 @@ export default function Home() {
     setSelectedNote(await getNote(note.id));
   };
 
-  const handleContentChange = (content: string) => {
+  const handleContentChange = async (content: string) => {
     if (!selectedNote) return;
 
-    setNotes((prevNotes) =>
-      prevNotes.map((note) =>
-        note.id === selectedNoteId ? { ...note, content } : note,
-      ),
-    );
+    try {
+      // Update in IndexedDB
+      const updatedNote = await updateNote(selectedNote.id, content);
+
+      // Update local state
+      setNotes((prevNotes) =>
+        prevNotes.map((note) =>
+          note.id === selectedNoteId ? updatedNote : note,
+        ),
+      );
+
+      // Update selected note
+      setSelectedNote(updatedNote);
+    } catch (error) {
+      console.error('Failed to update note:', error);
+    }
   };
+
+  const handleCreateNote = async () => {
+    try {
+      const newNote = await createNote("");
+      setNotes((prevNotes) => [newNote, ...prevNotes]);
+      await handleNoteSelect(newNote);
+    } catch (error) {
+      console.error('Failed to create note:', error);
+    }
+  };
+
+  // Keyboard shortcut for creating new notes
+  useNewNoteKeybinding(handleCreateNote);
 
   return (
     <SidebarProvider>
@@ -64,7 +89,7 @@ export default function Home() {
             orientation="vertical"
             className="mr-2 data-[orientation=vertical]:h-4"
           />
-          <HomeMenubar />
+          <HomeMenubar onCreateNote={handleCreateNote} />
         </header>
         <div className="flex flex-1 flex-col p-4">
           {isLoading ? (
