@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { AppSidebar } from "@/components/home/app-sidebar";
 import { HomeMenubar } from "@/components/home/menubar";
 import { Separator } from "@/components/ui/separator";
@@ -9,15 +9,20 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Textarea } from "@/components/ui/textarea";
 import type { Note } from "@/lib/types";
 import { getAllNotes, getNote, createNote, updateNote } from "@/lib/indexdb";
 import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
+import "@mdxeditor/editor/style.css";
+
+const Editor = lazy(() => import("@/docs/editor"));
 
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const selectedNote = useMemo(
+    () => notes.find((note) => note.id === selectedNoteId) ?? null,
+    [notes, selectedNoteId],
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   // Load notes on component mount
@@ -27,7 +32,7 @@ export default function Home() {
         const allNotes = await getAllNotes();
         setNotes(allNotes);
       } catch (error) {
-        console.error('Failed to load notes:', error);
+        console.error("Failed to load notes:", error);
       } finally {
         setIsLoading(false);
       }
@@ -36,9 +41,8 @@ export default function Home() {
     loadNotes();
   }, []);
 
-  const handleNoteSelect = async (note: Note) => {
+  const handleNoteSelect = (note: Note) => {
     setSelectedNoteId(note.id);
-    setSelectedNote(await getNote(note.id));
   };
 
   const handleContentChange = async (content: string) => {
@@ -54,11 +58,8 @@ export default function Home() {
           note.id === selectedNoteId ? updatedNote : note,
         ),
       );
-
-      // Update selected note
-      setSelectedNote(updatedNote);
     } catch (error) {
-      console.error('Failed to update note:', error);
+      console.error("Failed to update note:", error);
     }
   };
 
@@ -66,9 +67,9 @@ export default function Home() {
     try {
       const newNote = await createNote("");
       setNotes((prevNotes) => [newNote, ...prevNotes]);
-      await handleNoteSelect(newNote);
+      handleNoteSelect(newNote);
     } catch (error) {
-      console.error('Failed to create note:', error);
+      console.error("Failed to create note:", error);
     }
   };
 
@@ -97,15 +98,18 @@ export default function Home() {
               <div className="text-muted-foreground">Loading notes...</div>
             </div>
           ) : selectedNote ? (
-            <Textarea
-              value={selectedNote.content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              className="flex-1 min-h-[400px] resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent"
-              placeholder="Start typing..."
-            />
+            <Suspense fallback={<div>Loading editor...</div>}>
+              <Editor
+                key={selectedNote.id}
+                markdown={selectedNote.content}
+                onChange={handleContentChange}
+              />
+            </Suspense>
           ) : (
             <div className="flex items-center justify-center flex-1">
-              <div className="text-muted-foreground">Select a note to start editing</div>
+              <div className="text-muted-foreground">
+                Select a note to start editing
+              </div>
             </div>
           )}
         </div>
