@@ -14,7 +14,7 @@ import { getAllNotes, getNote, createNote, updateNote } from "@/lib/indexdb";
 import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
 import "@mdxeditor/editor/style.css";
 
-const Editor = lazy(() => import("@/docs/editor"));
+const Editor = lazy(() => import("@/components/editor"));
 
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>([]);
