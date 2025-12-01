@@ -83,7 +83,7 @@ export default function Home() {
         onNoteSelect={handleNoteSelect}
         selectedNoteId={selectedNoteId || undefined}
       />
-      <SidebarInset>
+      <SidebarInset className="h-svh overflow-hidden">
         <header className="bg-background sticky top-0 flex shrink-0 items-center gap-2 border-b p-2">
           <SidebarTrigger className="-ml-1" />
           <Separator
@@ -92,7 +92,7 @@ export default function Home() {
           />
           <HomeMenubar onCreateNote={handleCreateNote} />
         </header>
-        <div className="flex flex-1 flex-col p-4">
+        <div className="flex flex-1 flex-col p-4 overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center flex-1">
               <div className="text-muted-foreground">Loading notes...</div>

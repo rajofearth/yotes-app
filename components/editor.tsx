@@ -79,8 +79,8 @@ export default function Editor({
     <MDXEditor
       markdown={markdown}
       onChange={onChange}
-      className="dark:bg-input/30 flex flex-col min-h-16 w-full rounded-md border bg-transparent text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-      contentEditableClassName="prose max-w-full"
+      className="dark:bg-input/30 flex flex-col h-full w-full rounded-md border bg-transparent text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm overflow-y-auto"
+      contentEditableClassName="prose dark:prose-invert max-w-full min-h-full pb-4"
       plugins={allPlugins(markdown)}
     />
   )
