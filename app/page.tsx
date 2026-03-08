@@ -14,15 +14,16 @@ import type { Note } from "@/lib/types";
 import { getAllNotes, getNote, createNote, updateNote } from "@/lib/indexdb";
 import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
 import { useReactToPrint } from "react-to-print";
-import { useKeybinding } from "@/hooks/use-keybinding";
+import { usePrintKeybinding } from "@/hooks/use-print-keybinding";
 
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const contentRef = useRef<HTMLDocument>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const reactToPrintFn = useReactToPrint({ contentRef });
+
   // Load notes on component mount
   useEffect(() => {
     const loadNotes = async () => {
@@ -78,19 +79,10 @@ export default function Home() {
   // Keyboard shortcut for creating new notes
   useNewNoteKeybinding(handleCreateNote);
 
-  useKeybinding(
-    () => {
-      reactToPrintFn();
-    },
-    {
-      key: "p",
-      metaKey: true,
-      ctrlKey: false,
-      altKey: true,
-      preventDefault: true,
-      ignoreInput: true,
-    },
-  );
+  // Keyboard shortcut for printing notes
+  usePrintKeybinding(() => {
+    reactToPrintFn();
+  });
 
   return (
     <SidebarProvider>
@@ -106,7 +98,10 @@ export default function Home() {
             orientation="vertical"
             className="mr-2 data-[orientation=vertical]:h-4"
           />
-          <HomeMenubar onCreateNote={handleCreateNote} />
+          <HomeMenubar
+            onCreateNote={handleCreateNote}
+            onPrint={() => reactToPrintFn()}
+          />
         </header>
         <div className="flex flex-1 flex-col p-4" ref={contentRef}>
           {isLoading ? (
@@ -117,7 +112,7 @@ export default function Home() {
             <Textarea
               value={selectedNote.content}
               onChange={(e) => handleContentChange(e.target.value)}
-              className="flex-1 min-h-[400px] resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent"
+              className="flex-1 min-h-100 resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent"
               placeholder="Start typing..."
             />
           ) : (
