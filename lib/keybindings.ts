@@ -25,14 +25,14 @@ export const keybindings: KeybindingDefinition[] = [
     id: "new-window",
     label: "New Window",
     category: "File",
-    options: { key: "w", metaKey: true, ctrlKey: true },
+    options: { key: "w", metaKey: true, altKey: true },
     display: "⌘W",
   },
   {
     id: "print",
     label: "Print...",
     category: "File",
-    options: { key: "p", metaKey: true, ctrlKey: true },
+    options: { key: "p", metaKey: true, altKey: true },
     display: "⌘P",
   },
   // Edit

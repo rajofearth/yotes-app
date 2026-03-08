@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppSidebar } from "@/components/home/app-sidebar";
 import { HomeMenubar } from "@/components/home/menubar";
 import { Separator } from "@/components/ui/separator";
@@ -13,13 +13,16 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Note } from "@/lib/types";
 import { getAllNotes, getNote, createNote, updateNote } from "@/lib/indexdb";
 import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
+import { useReactToPrint } from "react-to-print";
+import { useKeybinding } from "@/hooks/use-keybinding";
 
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
+  const contentRef = useRef<HTMLDocument>(null);
+  const reactToPrintFn = useReactToPrint({ contentRef });
   // Load notes on component mount
   useEffect(() => {
     const loadNotes = async () => {
@@ -27,7 +30,7 @@ export default function Home() {
         const allNotes = await getAllNotes();
         setNotes(allNotes);
       } catch (error) {
-        console.error('Failed to load notes:', error);
+        console.error("Failed to load notes:", error);
       } finally {
         setIsLoading(false);
       }
@@ -58,7 +61,7 @@ export default function Home() {
       // Update selected note
       setSelectedNote(updatedNote);
     } catch (error) {
-      console.error('Failed to update note:', error);
+      console.error("Failed to update note:", error);
     }
   };
 
@@ -68,12 +71,26 @@ export default function Home() {
       setNotes((prevNotes) => [newNote, ...prevNotes]);
       await handleNoteSelect(newNote);
     } catch (error) {
-      console.error('Failed to create note:', error);
+      console.error("Failed to create note:", error);
     }
   };
 
   // Keyboard shortcut for creating new notes
   useNewNoteKeybinding(handleCreateNote);
+
+  useKeybinding(
+    () => {
+      reactToPrintFn();
+    },
+    {
+      key: "p",
+      metaKey: true,
+      ctrlKey: false,
+      altKey: true,
+      preventDefault: true,
+      ignoreInput: true,
+    },
+  );
 
   return (
     <SidebarProvider>
@@ -91,7 +108,7 @@ export default function Home() {
           />
           <HomeMenubar onCreateNote={handleCreateNote} />
         </header>
-        <div className="flex flex-1 flex-col p-4">
+        <div className="flex flex-1 flex-col p-4" ref={contentRef}>
           {isLoading ? (
             <div className="flex items-center justify-center flex-1">
               <div className="text-muted-foreground">Loading notes...</div>
@@ -105,7 +122,9 @@ export default function Home() {
             />
           ) : (
             <div className="flex items-center justify-center flex-1">
-              <div className="text-muted-foreground">Select a note to start editing</div>
+              <div className="text-muted-foreground">
+                Select a note to start editing
+              </div>
             </div>
           )}
         </div>

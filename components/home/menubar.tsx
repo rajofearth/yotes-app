@@ -20,9 +20,10 @@ import { useThemeToggle } from "@/hooks/use-theme-toggle";
 
 interface HomeMenubarProps {
   onCreateNote?: () => void;
+  onPrint?: () => void;
 }
 
-export function HomeMenubar({ onCreateNote }: HomeMenubarProps) {
+export function HomeMenubar({ onCreateNote, onPrint }: HomeMenubarProps) {
   const { toggleTheme } = useThemeToggle();
   const { open, setOpen } = useKeybindingsDialog();
 
@@ -48,7 +49,7 @@ export function HomeMenubar({ onCreateNote }: HomeMenubarProps) {
               </MenubarSubContent>
             </MenubarSub>
             <MenubarSeparator />
-            <MenubarItem>
+            <MenubarItem onClick={onPrint}>
               Print... <MenubarShortcut>⌘P</MenubarShortcut>
             </MenubarItem>
           </MenubarContent>
