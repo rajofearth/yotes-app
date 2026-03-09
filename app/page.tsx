@@ -45,8 +45,16 @@ export default function Home() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPrinting, setIsPrinting] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const reactToPrintFn = useReactToPrint({ contentRef });
+  const reactToPrintFn = useReactToPrint({
+    contentRef,
+    onBeforeGetContent: () => {
+      setIsPrinting(true);
+      return new Promise((resolve) => setTimeout(resolve, 100));
+    },
+    onAfterPrint: () => setIsPrinting(false),
+  });
 
   // Load notes on component mount
   useEffect(() => {
@@ -137,12 +145,12 @@ export default function Home() {
               key={selectedNote.id}
               markdown={selectedNote.content}
               onChange={(e) => handleContentChange(e)}
-              className={`flex-1 min-h-100 resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent ${resolvedTheme === "dark" ? "dark-theme dark-editor" : ""}`}
+              className={`flex-1 min-h-100 resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent ${resolvedTheme === "dark" && !isPrinting ? "dark-theme dark-editor" : ""}`}
               placeholder="Start typing..."
               plugins={[
                 toolbarPlugin({
                   toolbarClassName:
-                    "flex-1 min-h-auto max-w-auto resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent",
+                    "flex-1 min-h-auto max-w-auto resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent print:hidden",
                   toolbarContents: () => (
                     <>
                       <UndoRedo />
