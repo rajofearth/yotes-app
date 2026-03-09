@@ -10,7 +10,14 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import type { Note } from "@/lib/types";
-import { getAllNotes, getNote, createNote, updateNote } from "@/lib/indexdb";
+import {
+  getAllNotes,
+  getNote,
+  createNote,
+  updateNote,
+  saveImage,
+  getImage,
+} from "@/lib/indexdb";
 import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
 import { useReactToPrint } from "react-to-print";
 import { usePrintKeybinding } from "@/hooks/use-print-keybinding";
@@ -28,6 +35,8 @@ import {
 } from "@mdxeditor/editor";
 import "@mdxeditor/editor/style.css";
 import { useTheme } from "next-themes";
+
+const imageCache = new Map<string, string>();
 
 export default function Home() {
   const { resolvedTheme } = useTheme();
@@ -146,13 +155,24 @@ export default function Home() {
                   ),
                 }),
                 imagePlugin({
-                  imageUploadHandler: () => {
-                    return Promise.resolve("https://picsum.photos/200/300");
+                  imageUploadHandler: async (image) => {
+                    const id = await saveImage(image);
+                    return id;
                   },
-                  imageAutocompleteSuggestions: [
-                    "https://picsum.photos/200/300",
-                    "https://picsum.photos/200",
-                  ],
+                  imagePreviewHandler: async (imageSource) => {
+                    if (imageSource.startsWith("img-")) {
+                      if (imageCache.has(imageSource)) {
+                        return imageCache.get(imageSource)!;
+                      }
+                      const blob = await getImage(imageSource);
+                      if (blob) {
+                        const url = URL.createObjectURL(blob);
+                        imageCache.set(imageSource, url);
+                        return url;
+                      }
+                    }
+                    return imageSource;
+                  },
                 }),
               ]}
             />

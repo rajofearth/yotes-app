@@ -8,14 +8,15 @@
 // - Title is derived from first line of content (handled in utils.ts, not stored here)
 // - All operations serialized via PQueue (concurrency: 1) to avoid concurrent DB access issues
 
-import PQueue from 'p-queue';
+import PQueue from "p-queue";
 
 // Install via: npm install p-queue
 // Types: npm install @types/p-queue (if needed, but usually bundled)
 
-const DB_NAME = 'notes';
-const DB_VERSION = 1;
-const STORE_NAME = 'notes';
+const DB_NAME = "notes";
+const DB_VERSION = 2;
+const STORE_NAME = "notes";
+const IMAGES_STORE_NAME = "images";
 const CONCURRENCY = 1; // Serialize all ops
 
 // Singleton DB promise
@@ -32,8 +33,8 @@ function openDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
 
   // Ensure we're on the client side
-  if (typeof window === 'undefined') {
-    throw new Error('IndexedDB is only available in browser environment');
+  if (typeof window === "undefined") {
+    throw new Error("IndexedDB is only available in browser environment");
   }
 
   dbPromise = new Promise((resolve, reject) => {
@@ -45,16 +46,16 @@ function openDB(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        // Primary key on 'id' handles uniqueness; no additional index needed unless querying other fields
-        // Optional: Add index on 'updatedAt' for sorting if needed in future
-        // store.createIndex('updatedAt', 'updatedAt', { unique: false });
+        db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(IMAGES_STORE_NAME)) {
+        db.createObjectStore(IMAGES_STORE_NAME, { keyPath: "id" });
       }
     };
 
     // Handle blocking (e.g., other tabs open)
     request.onblocked = () => {
-      console.warn('DB upgrade blocked; close other tabs');
+      console.warn("DB upgrade blocked; close other tabs");
     };
   });
 
@@ -62,17 +63,19 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 /**
- * Generic transaction helper for read/write ops.
+ * Generic transaction helper for read/write ops on a specific store.
+ * @param storeName Name of the object store
  * @param mode 'readonly' | 'readwrite'
  * @param callback Async function using the store
  */
-async function transact<T>(
+async function transactStore<T>(
+  storeName: string,
   mode: IDBTransactionMode,
-  callback: (store: IDBObjectStore) => Promise<T>
+  callback: (store: IDBObjectStore) => Promise<T>,
 ): Promise<T> {
   const db = await openDB();
-  const tx = db.transaction([STORE_NAME], mode);
-  const store = tx.objectStore(STORE_NAME);
+  const tx = db.transaction([storeName], mode);
+  const store = tx.objectStore(storeName);
 
   try {
     const result = await callback(store);
@@ -85,6 +88,74 @@ async function transact<T>(
 }
 
 /**
+ * Generic transaction helper for read/write ops on the notes store.
+ * @param mode 'readonly' | 'readwrite'
+ * @param callback Async function using the store
+ */
+async function transact<T>(
+  mode: IDBTransactionMode,
+  callback: (store: IDBObjectStore) => Promise<T>,
+): Promise<T> {
+  return transactStore(STORE_NAME, mode, callback);
+}
+
+export interface StoredImage {
+  id: string;
+  blob: Blob;
+  createdAt: Date;
+}
+
+/**
+ * Save an uploaded image to IndexedDB.
+ * @param file The image file to save
+ * @returns Promise resolving to a custom image ID string
+ */
+export async function saveImage(file: File): Promise<string> {
+  return queue.add(async () => {
+    const id = `img-${crypto.randomUUID()}`;
+    const storedImage: StoredImage = {
+      id,
+      blob: file,
+      createdAt: new Date(),
+    };
+
+    await transactStore(IMAGES_STORE_NAME, "readwrite", async (store) => {
+      const request = store.add(storedImage);
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(storedImage);
+        request.onerror = () => reject(request.error);
+      });
+    });
+
+    return id;
+  });
+}
+
+/**
+ * Retrieve an image from IndexedDB by its ID.
+ * @param id The image ID string
+ * @returns Promise resolving to the image Blob or null if not found
+ */
+export async function getImage(id: string): Promise<Blob | null> {
+  return queue.add(async () => {
+    const result = await transactStore(
+      IMAGES_STORE_NAME,
+      "readonly",
+      async (store) => {
+        const request = store.get(id);
+        return new Promise<StoredImage | undefined>((resolve, reject) => {
+          request.onsuccess = () =>
+            resolve(request.result as StoredImage | undefined);
+          request.onerror = () => reject(request.error);
+        });
+      },
+    );
+
+    return result?.blob ?? null;
+  });
+}
+
+/**
  * Create a new note.
  * Generates UUID id, extracts no title here (do in utils.ts), sets created/updated to now.
  * @param content Initial note content (string)
@@ -93,7 +164,7 @@ async function transact<T>(
 export async function createNote(content: string): Promise<Note> {
   return queue.add(async () => {
     const now = new Date();
-    const id = crypto.randomUUID(); 
+    const id = crypto.randomUUID();
 
     const note: Note = {
       id,
@@ -102,7 +173,7 @@ export async function createNote(content: string): Promise<Note> {
       updatedAt: now,
     };
 
-    await transact('readwrite', async (store) => {
+    await transact("readwrite", async (store) => {
       const request = store.add(note);
       return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve(note);
@@ -121,15 +192,12 @@ export async function createNote(content: string): Promise<Note> {
  * @param content New content
  * @returns Promise<Note>
  */
-export async function updateNote(
-  id: string,
-  content: string
-): Promise<Note> {
+export async function updateNote(id: string, content: string): Promise<Note> {
   return queue.add(async () => {
     const now = new Date();
 
     // Fetch existing to preserve createdAt
-    const existing = await transact('readonly', async (store) => {
+    const existing = await transact("readonly", async (store) => {
       const request = store.get(id);
       return new Promise<Note | undefined>((resolve, reject) => {
         request.onsuccess = () => resolve(request.result as Note | undefined);
@@ -150,7 +218,7 @@ export async function updateNote(
       updatedAt: now,
     };
 
-    await transact('readwrite', async (store) => {
+    await transact("readwrite", async (store) => {
       const request = store.put(updatedNote);
       return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve(updatedNote);
@@ -169,7 +237,7 @@ export async function updateNote(
  */
 export async function deleteNote(id: string): Promise<void> {
   return queue.add(async () => {
-    await transact('readwrite', async (store) => {
+    await transact("readwrite", async (store) => {
       const request = store.delete(id);
       return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve(undefined);
@@ -193,7 +261,7 @@ export interface Note {
 
 export async function getNote(id: string): Promise<Note | null> {
   return queue.add(async () => {
-    const result = await transact('readonly', async (store) => {
+    const result = await transact("readonly", async (store) => {
       const request = store.get(id);
       return new Promise<Note | undefined>((resolve, reject) => {
         request.onsuccess = () => resolve(request.result as Note | undefined);
@@ -212,13 +280,17 @@ export async function getNote(id: string): Promise<Note | null> {
  */
 export async function getAllNotes(): Promise<Note[]> {
   return queue.add(async () => {
-    const notes = await transact('readonly', async (store) => {
+    const notes = await transact("readonly", async (store) => {
       const request = store.getAll();
       return new Promise<Note[]>((resolve, reject) => {
         request.onsuccess = () => {
           const rawNotes = request.result as Note[];
           // Sort by updatedAt desc (client-side for simplicity)
-          resolve(rawNotes.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
+          resolve(
+            rawNotes.sort(
+              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+            ),
+          );
         };
         request.onerror = () => reject(request.error);
       });
@@ -229,8 +301,8 @@ export async function getAllNotes(): Promise<Note[]> {
 }
 
 // Close DB on app unload (optional, for cleanup)
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => {
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", () => {
     dbPromise?.then((db) => {
       db.close();
       dbPromise = null;
