@@ -32,7 +32,7 @@ export const keybindings: KeybindingDefinition[] = [
     id: "print",
     label: "Print...",
     category: "File",
-    options: { key: "p", metaKey: true, altKey: true },
+    options: { key: "p", altKey: true },
     display: "⌘P",
   },
   // Edit

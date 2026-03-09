@@ -97,7 +97,20 @@ export function HomeMenubar({ onCreateNote, onPrint }: HomeMenubarProps) {
         <MenubarMenu>
           <MenubarTrigger>View</MenubarTrigger>
           <MenubarContent>
-            <MenubarCheckboxItem>Always Show Bookmarks Bar</MenubarCheckboxItem>
+            <MenubarSub>
+              <MenubarSubTrigger>Zoom</MenubarSubTrigger>
+              <MenubarSubContent>
+                <MenubarItem>
+                  Zoom In <MenubarShortcut>⌘+Plus</MenubarShortcut>
+                </MenubarItem>
+                <MenubarItem>
+                  Zoom Out <MenubarShortcut>⌘+Minus</MenubarShortcut>
+                </MenubarItem>
+                <MenubarItem>
+                  Zoom Reset <MenubarShortcut>⌘+0</MenubarShortcut>
+                </MenubarItem>
+              </MenubarSubContent>
+            </MenubarSub>
             <MenubarCheckboxItem checked>
               Always Show Full URLs
             </MenubarCheckboxItem>

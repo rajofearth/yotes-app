@@ -35,10 +35,11 @@ export function useThemeToggle(options?: { key?: string; enabled?: boolean }) {
     },
     {
       key: options?.key ?? "t",
-      metaKey: true,
-      ctrlKey: true,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: true,
       preventDefault: true,
-      ignoreInput: true,
+      ignoreInput: false,
       enabled: options?.enabled ?? true,
     },
   );
