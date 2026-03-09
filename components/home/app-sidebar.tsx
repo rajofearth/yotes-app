@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyMedia,
   EmptyTitle,
@@ -135,7 +134,10 @@ export function AppSidebar({
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    role="img"
+                    aria-label="Empty notes icon"
                   >
+                    <title>Empty notes icon</title>
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -157,7 +159,10 @@ export function AppSidebar({
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    role="img"
+                    aria-label="No search results icon"
                   >
+                    <title>No search results icon</title>
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"

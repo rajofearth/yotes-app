@@ -172,7 +172,7 @@ export default function Home() {
                   imagePreviewHandler: async (imageSource) => {
                     if (imageSource.startsWith("img-")) {
                       if (imageCache.has(imageSource)) {
-                        return imageCache.get(imageSource)!;
+                        return imageCache.get(imageSource) || "";
                       }
                       const blob = await getImage(imageSource);
                       if (blob) {

@@ -21,10 +21,9 @@ import { useKeybinding } from "./use-keybinding";
 export function useNewNoteKeybinding(onCreateNote: () => void) {
   const keybinding = getKeybinding("new-note");
 
-  if (!keybinding) return;
-
   useKeybinding(onCreateNote, {
-    ...keybinding.options,
+    ...(keybinding?.options || { key: "" }),
+    enabled: !!keybinding,
     preventDefault: true,
     ignoreInput: true,
   });

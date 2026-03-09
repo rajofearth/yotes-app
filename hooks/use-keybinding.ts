@@ -94,6 +94,7 @@ export function useKeybinding(
     handler(event);
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: onKeyDown is stable via useEffectEvent
   useEffect(() => {
     if (!enabled) return;
 
@@ -101,5 +102,5 @@ export function useKeybinding(
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [enabled, onKeyDown]);
+  }, [enabled]);
 }

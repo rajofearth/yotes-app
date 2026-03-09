@@ -12,10 +12,9 @@ import { useKeybinding } from "./use-keybinding";
 export function usePrintKeybinding(onPrint: () => void) {
   const keybinding = getKeybinding("print");
 
-  if (!keybinding) return;
-
   useKeybinding(onPrint, {
-    ...keybinding.options,
+    ...(keybinding?.options || { key: "" }),
+    enabled: !!keybinding,
     preventDefault: true,
     ignoreInput: false, // We want users to be able to print while the editor is focused
   });
