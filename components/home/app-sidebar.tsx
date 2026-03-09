@@ -2,6 +2,13 @@
 
 import * as React from "react";
 import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -9,13 +16,6 @@ import {
   SidebarHeader,
   SidebarInput,
 } from "@/components/ui/sidebar";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import type { Note } from "@/lib/types";
 import { cn, formatNoteDate, getNoteTitle } from "@/lib/utils";
 
@@ -174,7 +174,11 @@ export function AppSidebar({
                 </EmptyMedia>
                 <EmptyTitle>No matches found</EmptyTitle>
                 <EmptyDescription>
-                  No notes match <span className="font-medium">&ldquo;{searchQuery}&rdquo;</span>. Try a different keyword.
+                  No notes match{" "}
+                  <span className="font-medium">
+                    &ldquo;{searchQuery}&rdquo;
+                  </span>
+                  . Try a different keyword.
                 </EmptyDescription>
               </Empty>
             ) : (
@@ -195,7 +199,9 @@ export function AppSidebar({
                     )}
                   >
                     <span className="font-medium truncate w-full">{title}</span>
-                    <span className="text-xs text-muted-foreground">{date}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {date}
+                    </span>
                   </button>
                 );
               })

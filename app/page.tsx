@@ -1,6 +1,19 @@
 "use client";
 
+import {
+  BlockTypeSelect,
+  BoldItalicUnderlineToggles,
+  CodeToggle,
+  CreateLink,
+  InsertCodeBlock,
+  InsertImage,
+  imagePlugin,
+  MDXEditor,
+  toolbarPlugin,
+  UndoRedo,
+} from "@mdxeditor/editor";
 import { useEffect, useRef, useState } from "react";
+import { useReactToPrint } from "react-to-print";
 import { AppSidebar } from "@/components/home/app-sidebar";
 import { HomeMenubar } from "@/components/home/menubar";
 import { Separator } from "@/components/ui/separator";
@@ -9,32 +22,20 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import type { Note } from "@/lib/types";
-import {
-  getAllNotes,
-  getNote,
-  createNote,
-  updateNote,
-  saveImage,
-  getImage,
-} from "@/lib/indexdb";
 import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
-import { useReactToPrint } from "react-to-print";
 import { usePrintKeybinding } from "@/hooks/use-print-keybinding";
 import {
-  MDXEditor,
-  UndoRedo,
-  BoldItalicUnderlineToggles,
-  toolbarPlugin,
-  BlockTypeSelect,
-  InsertCodeBlock,
-  CodeToggle,
-  CreateLink,
-  imagePlugin,
-  InsertImage,
-} from "@mdxeditor/editor";
+  createNote,
+  getAllNotes,
+  getImage,
+  getNote,
+  saveImage,
+  updateNote,
+} from "@/lib/indexdb";
+import type { Note } from "@/lib/types";
 import "@mdxeditor/editor/style.css";
 import { useTheme } from "next-themes";
+import { CustomImageDialog } from "@/components/editor/image-dialog";
 
 const imageCache = new Map<string, string>();
 
@@ -155,6 +156,7 @@ export default function Home() {
                   ),
                 }),
                 imagePlugin({
+                  ImageDialog: CustomImageDialog,
                   imageUploadHandler: async (image) => {
                     const id = await saveImage(image);
                     return id;

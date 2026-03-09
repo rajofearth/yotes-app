@@ -1,7 +1,7 @@
 "use client";
 
-import { useKeybinding } from "./use-keybinding";
 import { getKeybinding } from "@/lib/keybindings";
+import { useKeybinding } from "./use-keybinding";
 
 /**
  * Hook for handling the "New Note" keyboard shortcut (⌘⇧N / Ctrl+Shift+N).
