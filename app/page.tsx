@@ -15,8 +15,12 @@ import { getAllNotes, getNote, createNote, updateNote } from "@/lib/indexdb";
 import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
 import { useReactToPrint } from "react-to-print";
 import { usePrintKeybinding } from "@/hooks/use-print-keybinding";
+import { MDXEditor } from "@mdxeditor/editor";
+import "@mdxeditor/editor/style.css";
+import { useTheme } from "next-themes";
 
 export default function Home() {
+  const { resolvedTheme } = useTheme();
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -109,10 +113,10 @@ export default function Home() {
               <div className="text-muted-foreground">Loading notes...</div>
             </div>
           ) : selectedNote ? (
-            <Textarea
-              value={selectedNote.content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              className="flex-1 min-h-100 resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent"
+            <MDXEditor
+              markdown={selectedNote.content}
+              onChange={(e) => handleContentChange(e)}
+              className={`flex-1 min-h-100 resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent ${resolvedTheme === "dark" ? "dark-theme dark-editor" : ""}`}
               placeholder="Start typing..."
             />
           ) : (
