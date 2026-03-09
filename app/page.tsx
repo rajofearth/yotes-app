@@ -9,13 +9,23 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Textarea } from "@/components/ui/textarea";
 import type { Note } from "@/lib/types";
 import { getAllNotes, getNote, createNote, updateNote } from "@/lib/indexdb";
 import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
 import { useReactToPrint } from "react-to-print";
 import { usePrintKeybinding } from "@/hooks/use-print-keybinding";
-import { MDXEditor } from "@mdxeditor/editor";
+import {
+  MDXEditor,
+  UndoRedo,
+  BoldItalicUnderlineToggles,
+  toolbarPlugin,
+  BlockTypeSelect,
+  InsertCodeBlock,
+  CodeToggle,
+  CreateLink,
+  imagePlugin,
+  InsertImage,
+} from "@mdxeditor/editor";
 import "@mdxeditor/editor/style.css";
 import { useTheme } from "next-themes";
 
@@ -114,10 +124,37 @@ export default function Home() {
             </div>
           ) : selectedNote ? (
             <MDXEditor
+              key={selectedNote.id}
               markdown={selectedNote.content}
               onChange={(e) => handleContentChange(e)}
               className={`flex-1 min-h-100 resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent ${resolvedTheme === "dark" ? "dark-theme dark-editor" : ""}`}
               placeholder="Start typing..."
+              plugins={[
+                toolbarPlugin({
+                  toolbarClassName:
+                    "flex-1 min-h-auto max-w-auto resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent",
+                  toolbarContents: () => (
+                    <>
+                      <UndoRedo />
+                      <BoldItalicUnderlineToggles />
+                      <BlockTypeSelect />
+                      <CreateLink />
+                      <CodeToggle />
+                      <InsertCodeBlock />
+                      <InsertImage />
+                    </>
+                  ),
+                }),
+                imagePlugin({
+                  imageUploadHandler: () => {
+                    return Promise.resolve("https://picsum.photos/200/300");
+                  },
+                  imageAutocompleteSuggestions: [
+                    "https://picsum.photos/200/300",
+                    "https://picsum.photos/200",
+                  ],
+                }),
+              ]}
             />
           ) : (
             <div className="flex items-center justify-center flex-1">
