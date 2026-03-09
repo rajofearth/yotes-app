@@ -49,7 +49,7 @@ export default function Home() {
   const contentRef = useRef<HTMLDivElement>(null);
   const reactToPrintFn = useReactToPrint({
     contentRef,
-    onBeforeGetContent: () => {
+    onBeforePrint: () => {
       setIsPrinting(true);
       return new Promise((resolve) => setTimeout(resolve, 100));
     },
