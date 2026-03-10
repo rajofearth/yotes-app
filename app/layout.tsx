@@ -34,6 +34,24 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
+            ::highlight(MdxSearch) {
+              background: rgba(255, 255, 0, 0.4);
+            }
+            .dark ::highlight(MdxSearch) {
+              background: rgba(255, 255, 0, 0.3);
+            }
+            ::highlight(MdxFocusSearch) {
+              background: rgba(255, 100, 0, 0.6);
+            }
+            .dark ::highlight(MdxFocusSearch) {
+              background: rgba(255, 150, 0, 0.5);
+            }
+          `,
+            }}
+          />
           <main>{children}</main>
         </ThemeProvider>
       </body>

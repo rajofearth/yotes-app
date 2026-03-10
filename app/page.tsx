@@ -11,6 +11,7 @@ import {
   MDXEditor,
   toolbarPlugin,
   UndoRedo,
+  searchPlugin,
 } from "@mdxeditor/editor";
 import { useEffect, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
@@ -36,6 +37,7 @@ import type { Note } from "@/lib/types";
 import "@mdxeditor/editor/style.css";
 import { useTheme } from "next-themes";
 import { CustomImageDialog } from "@/components/editor/image-dialog";
+import { MdxSearchToolbar } from "@/components/editor/mdxSearchToolbar";
 
 const imageCache = new Map<string, string>();
 
@@ -135,7 +137,7 @@ export default function Home() {
             onPrint={() => reactToPrintFn()}
           />
         </header>
-        <div className="flex flex-1 flex-col p-4" ref={contentRef}>
+        <div className="relative flex flex-1 flex-col p-4" ref={contentRef}>
           {isLoading ? (
             <div className="flex items-center justify-center flex-1">
               <div className="text-muted-foreground">Loading notes...</div>
@@ -148,6 +150,7 @@ export default function Home() {
               className={`flex-1 min-h-100 resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent ${resolvedTheme === "dark" && !isPrinting ? "dark-theme dark-editor" : ""}`}
               placeholder="Start typing..."
               plugins={[
+                searchPlugin(),
                 toolbarPlugin({
                   toolbarClassName:
                     "flex-1 min-h-auto max-w-auto resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent dark:bg-transparent print:hidden",
@@ -160,6 +163,7 @@ export default function Home() {
                       <CodeToggle />
                       <InsertCodeBlock />
                       <InsertImage />
+                      <MdxSearchToolbar />
                     </>
                   ),
                 }),
