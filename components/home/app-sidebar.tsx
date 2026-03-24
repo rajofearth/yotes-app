@@ -15,6 +15,21 @@ import {
   SidebarHeader,
   SidebarInput,
 } from "@/components/ui/sidebar";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  ClipboardPasteIcon,
+  CopyIcon,
+  PenBoxIcon,
+  ScissorsIcon,
+  TrashIcon,
+} from "lucide-react";
 import type { Note } from "@/lib/types";
 import { cn, formatNoteDate, getNoteTitle } from "@/lib/utils";
 
@@ -192,22 +207,40 @@ export function AppSidebar({
                 const date = formatNoteDate(note.updatedAt);
                 const isActive = selectedNoteId === note.id;
                 return (
-                  <button
-                    type="button"
-                    key={note.id}
-                    onClick={(e) => handleNoteClick(e, note)}
-                    className={cn(
-                      "flex w-full flex-col items-start gap-1 border-b p-4 text-left text-sm leading-tight last:border-b-0",
-                      isActive
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    )}
-                  >
-                    <span className="font-medium truncate w-full">{title}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {date}
-                    </span>
-                  </button>
+                  <ContextMenu>
+                    <ContextMenuTrigger>
+                      <button
+                        type="button"
+                        key={note.id}
+                        onClick={(e) => handleNoteClick(e, note)}
+                        className={cn(
+                          "flex w-full flex-col items-start gap-1 border-b p-4 text-left text-sm leading-tight last:border-b-0",
+                          isActive
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                        )}
+                      >
+                        <span className="font-medium truncate w-full">
+                          {title}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {date}
+                        </span>
+                      </button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem>
+                        <PenBoxIcon />
+                        Rename
+                      </ContextMenuItem>
+                      <ContextMenuGroup>
+                        <ContextMenuItem variant="destructive">
+                          <TrashIcon />
+                          Delete
+                        </ContextMenuItem>
+                      </ContextMenuGroup>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 );
               })
             )}
