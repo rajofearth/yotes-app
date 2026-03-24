@@ -20,16 +20,9 @@ import {
   ContextMenuContent,
   ContextMenuGroup,
   ContextMenuItem,
-  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  ClipboardPasteIcon,
-  CopyIcon,
-  PenBoxIcon,
-  ScissorsIcon,
-  TrashIcon,
-} from "lucide-react";
+import { PenBoxIcon, FileText, TrashIcon, X } from "lucide-react";
 import type { Note } from "@/lib/types";
 import { cn, formatNoteDate, getNoteTitle } from "@/lib/utils";
 
@@ -119,21 +112,7 @@ export function AppSidebar({
               className="absolute right-2 text-muted-foreground/80 transition hover:text-muted-foreground"
               aria-label="Clear search"
             >
-              <svg
-                className="size-4"
-                viewBox="0 0 20 20"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                <path
-                  d="M6 6l8 8m0-8l-8 8"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <X className="w-4 h-4 hover:bg-accent hover:rounded" />
             </button>
           ) : null}
         </div>
@@ -142,65 +121,21 @@ export function AppSidebar({
         <SidebarGroup className="px-0">
           <SidebarGroupContent>
             {!hasNotes ? (
-              <Empty className="border-dashed border-0">
-                <EmptyMedia>
-                  <svg
-                    className="size-12 text-muted-foreground/50"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    role="img"
-                    aria-label="Empty notes icon"
-                  >
-                    <title>Empty notes icon</title>
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                </EmptyMedia>
-                <EmptyTitle>No notes yet</EmptyTitle>
-                <EmptyDescription>
+              <div className="px-4 pt-6 flex flex-col gap-1">
+                <p className="text-sm text-muted-foreground">No notes yet.</p>
+                <p className="text-xs text-muted-foreground/50">
                   Create your first note to get started.
-                </EmptyDescription>
-              </Empty>
+                </p>
+              </div>
             ) : !hasResults ? (
-              <Empty className="border-dashed border-0">
-                <EmptyMedia>
-                  <svg
-                    className="size-12 text-muted-foreground/50"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    role="img"
-                    aria-label="No search results icon"
-                  >
-                    <title>No search results icon</title>
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M19.5 19.5l-2.475-2.475M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </EmptyMedia>
-                <EmptyTitle>No matches found</EmptyTitle>
-                <EmptyDescription>
-                  No notes match{" "}
-                  <span className="font-medium">
-                    &ldquo;{searchQuery}&rdquo;
-                  </span>
-                  . Try a different keyword.
-                </EmptyDescription>
-              </Empty>
+              <div className="px-4 pt-6 flex flex-col gap-1">
+                <p className="text-sm text-muted-foreground">
+                  No matches for "{searchQuery}" yet.
+                </p>
+                <p className="text-xs text-muted-foreground/50">
+                  Try a different note or create one.
+                </p>
+              </div>
             ) : (
               filteredNotes.map((note) => {
                 const title = getNoteTitle(note.content);
