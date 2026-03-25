@@ -32,6 +32,7 @@ import {
   getNote,
   saveImage,
   updateNote,
+  deleteNote,
 } from "@/lib/indexdb";
 import type { Note } from "@/lib/types";
 import "@mdxeditor/editor/style.css";
@@ -79,6 +80,21 @@ export default function Home() {
     setSelectedNote(await getNote(note.id));
   };
 
+  const handleNoteDelete = async (note: Note) => {
+    try {
+      await deleteNote(note.id);
+      setNotes((prev) => prev.filter((n) => n.id !== note.id));
+
+      // If the deleted note was selected, clear the editor
+      if (selectedNoteId === note.id) {
+        setSelectedNoteId(null);
+        setSelectedNote(null);
+      }
+    } catch {
+      console.error("Failed to delete " + note.id);
+    }
+  };
+
   const handleContentChange = async (content: string) => {
     if (!selectedNote) return;
 
@@ -123,6 +139,7 @@ export default function Home() {
       <AppSidebar
         notes={isLoading ? [] : notes}
         onNoteSelect={handleNoteSelect}
+        onNoteDelete={handleNoteDelete}
         selectedNoteId={selectedNoteId || undefined}
       />
       <SidebarInset>

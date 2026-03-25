@@ -2,12 +2,6 @@
 
 import * as React from "react";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -15,26 +9,21 @@ import {
   SidebarHeader,
   SidebarInput,
 } from "@/components/ui/sidebar";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuGroup,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { PenBoxIcon, FileText, TrashIcon, X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import type { Note } from "@/lib/types";
 import { cn, formatNoteDate, getNoteTitle } from "@/lib/utils";
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   notes: Note[];
   onNoteSelect?: (note: Note) => void;
+  onNoteDelete?: (note: Note) => void;
   selectedNoteId?: string;
 };
 
 export function AppSidebar({
   notes,
   onNoteSelect,
+  onNoteDelete,
   selectedNoteId,
   ...props
 }: AppSidebarProps) {
@@ -142,40 +131,39 @@ export function AppSidebar({
                 const date = formatNoteDate(note.updatedAt);
                 const isActive = selectedNoteId === note.id;
                 return (
-                  <ContextMenu>
-                    <ContextMenuTrigger>
-                      <button
-                        type="button"
-                        key={note.id}
-                        onClick={(e) => handleNoteClick(e, note)}
-                        className={cn(
-                          "flex w-full flex-col items-start gap-1 border-b p-4 text-left text-sm leading-tight last:border-b-0",
-                          isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                        )}
-                      >
-                        <span className="font-medium truncate w-full">
-                          {title}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {date}
-                        </span>
-                      </button>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem>
-                        <PenBoxIcon />
-                        Rename
-                      </ContextMenuItem>
-                      <ContextMenuGroup>
-                        <ContextMenuItem variant="destructive">
-                          <TrashIcon />
-                          Delete
-                        </ContextMenuItem>
-                      </ContextMenuGroup>
-                    </ContextMenuContent>
-                  </ContextMenu>
+                  <div
+                    key={note.id}
+                    className="relative group/note border-b last:border-b-0"
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => handleNoteClick(e, note)}
+                      className={cn(
+                        "flex w-full flex-col items-start gap-1 p-4 text-left text-sm leading-tight pr-10",
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      )}
+                    >
+                      <span className="font-medium truncate w-full">
+                        {title}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {date}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNoteDelete?.(note);
+                      }}
+                      className="absolute right-3 bottom-3.5 opacity-0 group-hover/note:opacity-100 text-muted-foreground/40 hover:text-destructive transition-opacity"
+                      aria-label="Delete note"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
                 );
               })
             )}
