@@ -9,9 +9,9 @@ import {
   InsertImage,
   imagePlugin,
   MDXEditor,
+  searchPlugin,
   toolbarPlugin,
   UndoRedo,
-  searchPlugin,
 } from "@mdxeditor/editor";
 import { useEffect, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
@@ -27,12 +27,12 @@ import { useNewNoteKeybinding } from "@/hooks/use-new-note-keybinding";
 import { usePrintKeybinding } from "@/hooks/use-print-keybinding";
 import {
   createNote,
+  deleteNote,
   getAllNotes,
   getImage,
   getNote,
   saveImage,
   updateNote,
-  deleteNote,
 } from "@/lib/indexdb";
 import type { Note } from "@/lib/types";
 import "@mdxeditor/editor/style.css";
@@ -91,7 +91,7 @@ export default function Home() {
         setSelectedNote(null);
       }
     } catch {
-      console.error("Failed to delete " + note.id);
+      console.error(`Failed to delete note: ${note.id}`);
     }
   };
 
@@ -112,7 +112,7 @@ export default function Home() {
       // Update selected note
       setSelectedNote(updatedNote);
     } catch (error) {
-      console.error("Failed to update note:", error);
+      console.error(`Failed to update note: ${selectedNoteId}`, error);
     }
   };
 
@@ -122,7 +122,7 @@ export default function Home() {
       setNotes((prevNotes) => [newNote, ...prevNotes]);
       await handleNoteSelect(newNote);
     } catch (error) {
-      console.error("Failed to create note:", error);
+      console.error(`Failed to create note: ${error}`);
     }
   };
 

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useEditorSearch } from "@mdxeditor/editor";
-import { Search, X, ChevronUp, ChevronDown, Replace } from "lucide-react";
+import { ChevronDown, ChevronUp, Replace, Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";

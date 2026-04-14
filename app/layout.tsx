@@ -41,9 +41,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <style
-            dangerouslySetInnerHTML={{
-              __html: `
+          <style>{`
             ::highlight(MdxSearch) {
               background: rgba(255, 255, 0, 0.4);
             }
@@ -56,9 +54,7 @@ export default function RootLayout({
             .dark ::highlight(MdxFocusSearch) {
               background: rgba(255, 150, 0, 0.5);
             }
-          `,
-            }}
-          />
+          `}</style>
           <main>{children}</main>
         </ThemeProvider>
       </body>

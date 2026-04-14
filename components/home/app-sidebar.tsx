@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2, X } from "lucide-react";
 import * as React from "react";
 import {
   Sidebar,
@@ -9,7 +10,6 @@ import {
   SidebarHeader,
   SidebarInput,
 } from "@/components/ui/sidebar";
-import { Trash2, X } from "lucide-react";
 import type { Note } from "@/lib/types";
 import { cn, formatNoteDate, getNoteTitle } from "@/lib/utils";
 
