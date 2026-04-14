@@ -1,48 +1,20 @@
-import { type ClassValue, clsx } from "clsx";
+import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/**
- * Format a date in the format "Oct 29 2025 at 2:27 PM"
- */
-export function formatNoteDate(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
+export function getNoteTitle(content: string) {
+  const firstLine = content.trim().split("\n")[0]?.trim();
 
-  const month = months[d.getMonth()];
-  const day = d.getDate();
-  const year = d.getFullYear();
-
-  let hours = d.getHours();
-  const minutes = d.getMinutes();
-  const ampm = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12;
-  hours = hours || 12;
-  const minutesStr = minutes.toString().padStart(2, "0");
-
-  return `${month} ${day} ${year} at ${hours}:${minutesStr} ${ampm}`;
+  return firstLine || "Untitled note";
 }
 
-/**
- * Extract the first line from note content to use as title
- */
-export function getNoteTitle(content: string): string {
-  const firstLine = content.split("\n")[0]?.trim();
-  return firstLine || "Untitled";
+export function formatNoteDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
 }
