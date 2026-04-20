@@ -2,6 +2,7 @@ import { dequal } from "dequal";
 import superjson from "superjson";
 import * as z from "zod";
 import type { Note } from "@/lib/types";
+import { splitNoteTitleBody } from "@/lib/utils";
 
 export const NOTES_BACKUP_V1 = "notes.backup.v1" as const;
 export const NOTES_BACKUP_V2 = "notes.backup.v2" as const;
@@ -71,10 +72,55 @@ export type ImportDryRun = {
   conflicts: ConflictItem[];
 };
 
-export type ResolutionKey = `${ConflictItem["kind"]}:${string}`;
+/** Choice keys: one per image; per note title/body when both differ, else `note:id:full` when only metadata differs. */
+export type ResolutionKey = string;
 
-export function resolutionKey(item: ConflictItem): ResolutionKey {
-  return `${item.kind}:${item.id}`;
+export function imageConflictResolutionKey(
+  item: Extract<ConflictItem, { kind: "image" }>,
+): ResolutionKey {
+  return `image:${item.id}`;
+}
+
+/**
+ * All choice keys required for this conflict (note conflicts may need title and/or body separately).
+ */
+/** Stable list row id for UI (dismiss-after-resolve, keys). */
+export function conflictStableRowId(item: ConflictItem): string {
+  return item.kind === "image"
+    ? imageConflictResolutionKey(item)
+    : `note:${item.id}`;
+}
+
+export function resolutionKeysForConflict(item: ConflictItem): ResolutionKey[] {
+  if (item.kind === "image") {
+    return [imageConflictResolutionKey(item)];
+  }
+  const lt = splitNoteTitleBody(item.local.content);
+  const it = splitNoteTitleBody(item.incoming.content);
+  const keys: ResolutionKey[] = [];
+  if (lt.title !== it.title) keys.push(`note:${item.id}:title`);
+  if (lt.body !== it.body) keys.push(`note:${item.id}:body`);
+  if (keys.length === 0) keys.push(`note:${item.id}:full`);
+  return keys;
+}
+
+function mergeNoteFromTitleBodyChoices(
+  local: Note,
+  incoming: Note,
+  titlePick: "local" | "incoming",
+  bodyPick: "local" | "incoming",
+): Note {
+  const lt = splitNoteTitleBody(local.content);
+  const it = splitNoteTitleBody(incoming.content);
+  const title = titlePick === "incoming" ? it.title : lt.title;
+  const body = bodyPick === "incoming" ? it.body : lt.body;
+  const content = body.length > 0 ? `${title}\n${body}` : title;
+  return {
+    id: local.id,
+    content,
+    createdAt: local.createdAt,
+    updatedAt: new Date(),
+  };
 }
 
 const IMG_ID_RE = /\b(img-[0-9a-f-]{8,})\b/gi;
@@ -284,20 +330,56 @@ export function applyImportChoices(
   }
 
   for (const c of dryRun.conflicts) {
-    const key = resolutionKey(c);
-    const choice = choices.get(key);
-    if (!choice) {
-      throw new Error(`Missing resolution for ${c.kind} "${c.id}".`);
-    }
-    if (c.kind === "note") {
-      if (choice === "incoming") noteWrites.set(c.id, c.incoming);
-      if (choice === "local") noteWrites.delete(c.id);
+    if (c.kind === "image") {
+      const key = imageConflictResolutionKey(c);
+      const choice = choices.get(key);
+      if (!choice) {
+        throw new Error(`Missing resolution for image "${c.id}".`);
+      }
+      if (choice === "incoming") {
+        imageWrites.set(c.id, { blob: c.incoming, createdAt: new Date() });
+      } else {
+        imageWrites.delete(c.id);
+      }
       continue;
     }
-    if (choice === "incoming") {
-      imageWrites.set(c.id, { blob: c.incoming, createdAt: new Date() });
+
+    const required = resolutionKeysForConflict(c);
+    if (required.includes(`note:${c.id}:full`)) {
+      const choice = choices.get(`note:${c.id}:full`);
+      if (!choice) {
+        throw new Error(`Missing resolution for note "${c.id}" (full).`);
+      }
+      if (choice === "incoming") noteWrites.set(c.id, c.incoming);
+      else noteWrites.delete(c.id);
+      continue;
+    }
+
+    const titleKey = `note:${c.id}:title` as const;
+    const bodyKey = `note:${c.id}:body` as const;
+    const titlePick = required.includes(titleKey)
+      ? choices.get(titleKey)
+      : undefined;
+    const bodyPick = required.includes(bodyKey)
+      ? choices.get(bodyKey)
+      : undefined;
+    if (required.includes(titleKey) && !titlePick) {
+      throw new Error(`Missing resolution for note "${c.id}" (title).`);
+    }
+    if (required.includes(bodyKey) && !bodyPick) {
+      throw new Error(`Missing resolution for note "${c.id}" (body).`);
+    }
+    const tp = titlePick ?? "local";
+    const bp = bodyPick ?? "local";
+    if (tp === "local" && bp === "local") {
+      noteWrites.delete(c.id);
+    } else if (tp === "incoming" && bp === "incoming") {
+      noteWrites.set(c.id, c.incoming);
     } else {
-      imageWrites.delete(c.id);
+      noteWrites.set(
+        c.id,
+        mergeNoteFromTitleBodyChoices(c.local, c.incoming, tp, bp),
+      );
     }
   }
 

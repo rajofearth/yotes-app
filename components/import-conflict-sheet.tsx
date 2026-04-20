@@ -1,8 +1,9 @@
 "use client";
 
 import DiffMatchPatch from "diff-match-patch";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Markdown, { type Components } from "react-markdown";
+import rehypeRaw from "rehype-raw";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -13,9 +14,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  conflictStableRowId,
   type ImportDryRun,
+  imageConflictResolutionKey,
   type ResolutionKey,
-  resolutionKey,
+  resolutionKeysForConflict,
 } from "@/lib/backup";
 import { cn, splitNoteTitleBody } from "@/lib/utils";
 
@@ -26,52 +29,167 @@ const DMP_DIFF_INSERT = 1;
 
 const dmpSingleton = new DiffMatchPatch();
 
-const markdownComponents: Partial<Components> = {
-  p: (props) => <p className="mb-2 last:mb-0" {...props} />,
+/** Grid row collapse + opacity; pair with inner `min-h-0 overflow-hidden`. */
+const RESOLVE_OUT_BASE =
+  "grid transition-[grid-template-rows,opacity] duration-500 ease-out motion-reduce:transition-none";
+const RESOLVE_OUT_HIDDEN = "pointer-events-none grid-rows-[0fr] opacity-0";
+const RESOLVE_OUT_VISIBLE = "grid-rows-[1fr] opacity-100";
+
+function ResolveCollapse({
+  resolved,
+  afterCollapsed,
+  durationMs = 520,
+  className,
+  children,
+}: {
+  resolved: boolean;
+  afterCollapsed?: () => void;
+  durationMs?: number;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const afterRef = useRef(afterCollapsed);
+  afterRef.current = afterCollapsed;
+
+  useEffect(() => {
+    if (!resolved) return;
+    const cb = afterRef.current;
+    if (!cb) return;
+    const t = window.setTimeout(cb, durationMs);
+    return () => window.clearTimeout(t);
+  }, [resolved, durationMs]);
+
+  return (
+    <div
+      className={cn(
+        RESOLVE_OUT_BASE,
+        resolved ? RESOLVE_OUT_HIDDEN : RESOLVE_OUT_VISIBLE,
+        className,
+      )}
+      aria-hidden={resolved}
+    >
+      <div className="min-h-0 overflow-hidden">{children}</div>
+    </div>
+  );
+}
+
+function shortId(id: string): string {
+  if (id.length <= 12) return id;
+  return `${id.slice(0, 8)}…`;
+}
+
+/** Compact markdown inside diff rows; HTML (e.g. &lt;img&gt;) via rehype-raw. */
+const diffMarkdownComponents: Partial<Components> = {
+  p: (props) => <p className="mb-1.5 last:mb-0 leading-snug" {...props} />,
   h1: (props) => (
-    <h1 className="mt-3 mb-2 text-xl font-semibold first:mt-0" {...props} />
+    <h1 className="mt-2 mb-1 text-lg font-semibold first:mt-0" {...props} />
   ),
   h2: (props) => (
-    <h2 className="mt-3 mb-2 text-lg font-semibold first:mt-0" {...props} />
+    <h2 className="mt-2 mb-1 text-base font-semibold first:mt-0" {...props} />
   ),
   h3: (props) => (
-    <h3 className="mt-2 mb-1.5 text-base font-semibold first:mt-0" {...props} />
+    <h3 className="mt-1.5 mb-1 text-sm font-semibold first:mt-0" {...props} />
   ),
-  ul: (props) => <ul className="ml-5 list-disc space-y-1" {...props} />,
-  ol: (props) => <ol className="ml-5 list-decimal space-y-1" {...props} />,
-  li: (props) => <li className="leading-relaxed" {...props} />,
+  ul: (props) => <ul className="ml-4 list-disc space-y-0.5" {...props} />,
+  ol: (props) => <ol className="ml-4 list-decimal space-y-0.5" {...props} />,
+  li: (props) => <li className="leading-snug" {...props} />,
+  strong: (props) => <strong className="font-semibold" {...props} />,
   blockquote: (props) => (
     <blockquote
-      className="border-l-2 border-foreground/20 pl-3 text-muted-foreground"
+      className="border-l-2 border-foreground/20 py-0.5 pl-2 text-muted-foreground"
       {...props}
     />
   ),
   code: (props) => (
     <code
-      className="rounded bg-foreground/10 px-1 py-0.5 font-mono text-[13px]"
+      className="rounded bg-foreground/10 px-1 py-px font-mono text-[12px]"
       {...props}
     />
   ),
   pre: (props) => (
     <pre
-      className="overflow-x-auto rounded-md bg-foreground/10 p-2"
+      className="my-1 max-h-48 overflow-auto rounded bg-foreground/10 p-2 text-[12px] leading-snug"
       {...props}
     />
   ),
   a: (props) => (
-    <a className="text-primary underline underline-offset-4" {...props} />
+    <a className="text-primary underline underline-offset-2" {...props} />
   ),
   img: (props) => (
-    // biome-ignore lint/performance/noImgElement: Markdown may reference blob/data URLs; next/image is not suitable here.
+    // biome-ignore lint/performance/noImgElement: Blob / img- URLs in user markdown; constrained for layout.
     <img
       {...props}
       alt={props.alt ?? ""}
-      className="my-2 max-h-48 max-w-full rounded-md border border-border/60"
+      className="my-1 mx-auto block max-h-36 w-full max-w-[min(100%,24rem)] rounded-md border border-border/50 object-contain"
     />
   ),
 };
 
-function UnifiedContentDiff({
+function HoverResolutionToolbar({
+  storageKey,
+  choice,
+  disabled,
+  onKeepCurrent,
+  onAcceptIncoming,
+  children,
+}: {
+  storageKey: ResolutionKey;
+  choice: "local" | "incoming" | undefined;
+  disabled: boolean;
+  onKeepCurrent: (key: ResolutionKey) => void;
+  onAcceptIncoming: (key: ResolutionKey) => void;
+  children: React.ReactNode;
+}) {
+  const resolved = choice !== undefined;
+
+  return (
+    <ResolveCollapse resolved={resolved}>
+      <div className="group/diffhover relative min-h-9 rounded-lg">
+        {children}
+        <div
+          className={cn(
+            "absolute top-1 right-1 z-20 flex gap-1 transition-opacity duration-150",
+            "pointer-events-none opacity-0",
+            "group-hover/diffhover:pointer-events-auto group-hover/diffhover:opacity-100",
+          )}
+        >
+          <div className="flex gap-1 rounded-md border border-border/60 bg-popover/95 p-0.5 shadow-md backdrop-blur-md">
+            <Button
+              type="button"
+              size="sm"
+              disabled={disabled}
+              className={cn(
+                "h-7 border border-red-700/35 bg-red-600 px-2 text-xs text-white shadow-sm hover:bg-red-600/90",
+                "focus-visible:ring-2 focus-visible:ring-red-400/80",
+                choice === "local" &&
+                  "ring-2 ring-red-300 ring-offset-1 ring-offset-background",
+              )}
+              onClick={() => onKeepCurrent(storageKey)}
+            >
+              Keep current
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={disabled}
+              className={cn(
+                "h-7 border border-emerald-700/35 bg-emerald-600 px-2 text-xs text-white shadow-sm hover:bg-emerald-600/90",
+                "focus-visible:ring-2 focus-visible:ring-emerald-400/80",
+                choice === "incoming" &&
+                  "ring-2 ring-emerald-300 ring-offset-1 ring-offset-background",
+              )}
+              onClick={() => onAcceptIncoming(storageKey)}
+            >
+              Accept incoming
+            </Button>
+          </div>
+        </div>
+      </div>
+    </ResolveCollapse>
+  );
+}
+
+const UnifiedContentDiff = memo(function UnifiedContentDiff({
   before,
   after,
   plain = false,
@@ -90,11 +208,17 @@ function UnifiedContentDiff({
     plain ? (
       <span className="whitespace-pre-wrap break-words">{text}</span>
     ) : (
-      <Markdown components={markdownComponents}>{text}</Markdown>
+      <Markdown
+        components={diffMarkdownComponents}
+        rehypePlugins={[rehypeRaw]}
+        urlTransform={(u) => u}
+      >
+        {text}
+      </Markdown>
     );
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border/60 bg-muted/40 text-sm leading-relaxed dark:bg-zinc-950/40">
+    <div className="max-w-full overflow-hidden rounded-md border border-border/60 bg-muted/40 text-sm leading-snug dark:bg-zinc-950/40">
       {segments.map(([op, text], i) => {
         if (!text) return null;
 
@@ -102,9 +226,11 @@ function UnifiedContentDiff({
           return (
             <div
               key={`${i}-${text.length}`}
-              className="border-l-4 border-transparent px-3 py-1.5 text-foreground"
+              className="border-l-4 border-transparent px-2 py-0.5 text-foreground"
             >
-              {renderBody(text)}
+              <div className="min-w-0 max-w-full overflow-x-auto pr-1 [&_img]:max-h-32">
+                {renderBody(text)}
+              </div>
             </div>
           );
         }
@@ -120,11 +246,11 @@ function UnifiedContentDiff({
         return (
           <div
             key={`${i}-${text.length}`}
-            className={cn("flex gap-2 px-2 py-1.5", rowClass)}
+            className={cn("flex gap-1.5 px-1.5 py-0.5", rowClass)}
           >
             <div
               className={cn(
-                "w-6 shrink-0 select-none pt-0.5 text-center text-xs font-bold tabular-nums",
+                "w-5 shrink-0 select-none pt-px text-center text-[11px] font-bold tabular-nums leading-none",
                 isInsert
                   ? "text-emerald-700 dark:text-emerald-200"
                   : "text-red-700 dark:text-red-200",
@@ -133,10 +259,54 @@ function UnifiedContentDiff({
             >
               {gutter}
             </div>
-            <div className="min-w-0 flex-1">{renderBody(text)}</div>
+            <div className="min-w-0 max-w-full flex-1 overflow-x-auto pr-1 [&_img]:max-h-32">
+              {renderBody(text)}
+            </div>
           </div>
         );
       })}
+    </div>
+  );
+});
+
+function ImageBlobPair({ local, incoming }: { local: Blob; incoming: Blob }) {
+  const [urls, setUrls] = useState<[string, string] | null>(null);
+
+  useEffect(() => {
+    const a = URL.createObjectURL(local);
+    const b = URL.createObjectURL(incoming);
+    setUrls([a, b]);
+    return () => {
+      URL.revokeObjectURL(a);
+      URL.revokeObjectURL(b);
+    };
+  }, [local, incoming]);
+
+  if (!urls) return null;
+  const [currentSrc, incomingSrc] = urls;
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      <div className="space-y-1 rounded-md border border-border/50 bg-muted/20 p-2">
+        <p className="text-[11px] font-medium text-muted-foreground">Current</p>
+        {/* biome-ignore lint/performance/noImgElement: Blob preview URL from IndexedDB import review. */}
+        <img
+          src={currentSrc}
+          alt="Current version"
+          className="max-h-40 w-full max-w-full rounded object-contain"
+        />
+      </div>
+      <div className="space-y-1 rounded-md border border-border/50 bg-muted/20 p-2">
+        <p className="text-[11px] font-medium text-muted-foreground">
+          Imported
+        </p>
+        {/* biome-ignore lint/performance/noImgElement: Blob preview URL from backup import review. */}
+        <img
+          src={incomingSrc}
+          alt="Imported version"
+          className="max-h-40 w-full max-w-full rounded object-contain"
+        />
+      </div>
     </div>
   );
 }
@@ -161,18 +331,20 @@ export function ImportConflictSheet({
   onApply,
 }: ImportConflictSheetProps) {
   const { conflicts } = dryRun;
-  const [activeIndex, setActiveIndex] = useState(0);
   const [choices, setChoices] = useState<
     Map<ResolutionKey, "local" | "incoming">
   >(() => new Map());
+  const [dismissedRowIds, setDismissedRowIds] = useState(
+    () => new Set<string>(),
+  );
   const [panelWidthVw, setPanelWidthVw] = useState(75);
   const [isResizing, setIsResizing] = useState(false);
   const resizeOrigin = useRef<{ clientX: number; vw: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setActiveIndex(0);
     setChoices(new Map());
+    setDismissedRowIds(new Set());
   }, [open]);
 
   useEffect(() => {
@@ -198,44 +370,47 @@ export function ImportConflictSheet({
     };
   }, [isResizing]);
 
-  const current = conflicts[activeIndex] ?? null;
-  const currentKey = current ? resolutionKey(current) : null;
-  const currentChoice = currentKey ? choices.get(currentKey) : undefined;
+  const allResolved = useMemo(
+    () =>
+      conflicts.length > 0 &&
+      conflicts.every((c) =>
+        resolutionKeysForConflict(c).every((k) => choices.has(k)),
+      ),
+    [conflicts, choices],
+  );
 
-  const [localUrl, incomingUrl] = useMemo(() => {
-    if (!current || current.kind !== "image") {
-      return [null, null] as const;
-    }
-    return [
-      URL.createObjectURL(current.local),
-      URL.createObjectURL(current.incoming),
-    ] as const;
-  }, [current]);
+  const visibleConflicts = useMemo(
+    () => conflicts.filter((c) => !dismissedRowIds.has(conflictStableRowId(c))),
+    [conflicts, dismissedRowIds],
+  );
 
-  useEffect(() => {
-    return () => {
-      if (localUrl) URL.revokeObjectURL(localUrl);
-      if (incomingUrl) URL.revokeObjectURL(incomingUrl);
-    };
-  }, [localUrl, incomingUrl]);
-
-  const allResolved =
-    conflicts.length > 0 &&
-    conflicts.every((c) => choices.has(resolutionKey(c)));
-
-  const pick = useCallback(
-    (choice: "local" | "incoming") => {
-      if (!current) return;
+  const pickChoice = useCallback(
+    (key: ResolutionKey, choice: "local" | "incoming") => {
       setChoices((prev) => {
         const next = new Map(prev);
-        next.set(resolutionKey(current), choice);
+        next.set(key, choice);
         return next;
       });
-      setActiveIndex((idx) =>
-        Math.min(idx + 1, Math.max(conflicts.length - 1, 0)),
-      );
     },
-    [current, conflicts.length],
+    [],
+  );
+
+  const markRowDismissed = useCallback((rowId: string) => {
+    setDismissedRowIds((prev) => {
+      if (prev.has(rowId)) return prev;
+      const next = new Set(prev);
+      next.add(rowId);
+      return next;
+    });
+  }, []);
+
+  const handleKeep = useCallback(
+    (key: ResolutionKey) => pickChoice(key, "local"),
+    [pickChoice],
+  );
+  const handleAccept = useCallback(
+    (key: ResolutionKey) => pickChoice(key, "incoming"),
+    [pickChoice],
   );
 
   const handleApply = useCallback(() => {
@@ -250,17 +425,6 @@ export function ImportConflictSheet({
     },
     [panelWidthVw],
   );
-
-  const titleBody = useMemo(() => {
-    if (!current || current.kind !== "note") return null;
-    return {
-      local: splitNoteTitleBody(current.local.content),
-      incoming: splitNoteTitleBody(current.incoming.content),
-    };
-  }, [current]);
-
-  const titlesDiffer =
-    titleBody !== null && titleBody.local.title !== titleBody.incoming.title;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -288,37 +452,16 @@ export function ImportConflictSheet({
         />
 
         <SheetHeader className="shrink-0 gap-3 border-b border-border/40 bg-popover/40 px-4 py-3 pl-5 backdrop-blur-md">
-          <SheetTitle className="pr-10">Review import conflicts</SheetTitle>
-          <SheetDescription className="sr-only">
-            Green highlights additions from the import; red highlights text in
-            your current note that the import would remove. Drag the left edge
-            to resize this panel.
-          </SheetDescription>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="glass"
-                size="sm"
-                disabled={applying || activeIndex === 0}
-                onClick={() => setActiveIndex((i) => Math.max(i - 1, 0))}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                variant="glass"
-                size="sm"
-                disabled={applying || activeIndex >= conflicts.length - 1}
-                onClick={() =>
-                  setActiveIndex((i) => Math.min(i + 1, conflicts.length - 1))
-                }
-              >
-                Next
-              </Button>
+          <div className="flex flex-wrap items-start justify-between gap-3 pr-8">
+            <div className="min-w-0 space-y-1">
+              <SheetTitle>Review import conflicts</SheetTitle>
+              <p className="text-xs text-muted-foreground">
+                {visibleConflicts.length === 0 && conflicts.length > 0
+                  ? "Every conflict is resolved. Apply import or cancel when ready."
+                  : `${visibleConflicts.length} change${visibleConflicts.length === 1 ? "" : "s"} to review. Hover a diff to choose keep current or accept incoming.`}
+              </p>
             </div>
-            <div className="flex flex-wrap gap-2 sm:justify-end">
+            <div className="flex shrink-0 flex-wrap justify-end gap-2">
               <Button
                 type="button"
                 variant="glass"
@@ -332,26 +475,6 @@ export function ImportConflictSheet({
               </Button>
               <Button
                 type="button"
-                variant="glass"
-                size="sm"
-                className="border-rose-500/35 bg-rose-500/15 text-rose-900 hover:bg-rose-500/25 dark:text-rose-50 dark:hover:bg-rose-500/25"
-                disabled={!current || applying}
-                onClick={() => pick("local")}
-              >
-                Keep current
-              </Button>
-              <Button
-                type="button"
-                variant="glass"
-                size="sm"
-                className="border-emerald-500/35 bg-emerald-500/15 text-emerald-950 hover:bg-emerald-500/25 dark:text-emerald-50 dark:hover:bg-emerald-500/25"
-                disabled={!current || applying}
-                onClick={() => pick("incoming")}
-              >
-                Use imported
-              </Button>
-              <Button
-                type="button"
                 variant="glassPrimary"
                 size="sm"
                 disabled={!allResolved || applying}
@@ -361,128 +484,169 @@ export function ImportConflictSheet({
               </Button>
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            {conflicts.map((c, idx) => {
-              const key = resolutionKey(c);
-              const resolved = choices.has(key);
-              const label =
-                c.kind === "image" ? `Image ${c.id}` : `Note ${c.id}`;
-              return (
-                <Button
-                  key={key}
-                  type="button"
-                  size="sm"
-                  variant={idx === activeIndex ? "default" : "glass"}
-                  className={cn(
-                    "h-8 max-w-[220px] truncate text-xs",
-                    resolved &&
-                      idx !== activeIndex &&
-                      "border-emerald-500/40 dark:border-emerald-500/30",
-                  )}
-                  disabled={applying}
-                  onClick={() => setActiveIndex(idx)}
-                >
-                  {label}
-                  {resolved ? " · resolved" : ""}
-                </Button>
-              );
-            })}
-          </div>
+          <SheetDescription className="sr-only">
+            Scroll through each conflicting note or image. Resolve each
+            differing title, body, or whole note, and each image. Drag the left
+            edge to resize this panel.
+          </SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="min-h-0 flex-1 px-4 py-4 pl-5">
-          {!current ? (
+          {conflicts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No conflicts to review.
             </p>
-          ) : current.kind === "note" && titleBody ? (
-            <div className="space-y-6 pb-8">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                  {currentChoice
-                    ? `Selected: ${currentChoice === "local" ? "current" : "imported"}`
-                    : "Pick a version with the actions above"}
-                </p>
-              </div>
-
-              <section
-                className="space-y-2"
-                aria-labelledby="import-note-title-heading"
-              >
-                <h3
-                  id="import-note-title-heading"
-                  className="text-sm font-semibold text-foreground"
-                >
-                  Note title
-                </h3>
-                {titlesDiffer ? (
-                  <UnifiedContentDiff
-                    plain
-                    before={titleBody.local.title}
-                    after={titleBody.incoming.title}
-                  />
-                ) : (
-                  <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm text-foreground">
-                    {titleBody.local.title}
-                  </div>
-                )}
-              </section>
-
-              <section
-                className="space-y-2"
-                aria-labelledby="import-note-body-heading"
-              >
-                <h3
-                  id="import-note-body-heading"
-                  className="text-sm font-semibold text-foreground"
-                >
-                  Markdown body
-                </h3>
-                <UnifiedContentDiff
-                  before={titleBody.local.body}
-                  after={titleBody.incoming.body}
-                />
-              </section>
-            </div>
+          ) : visibleConflicts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Every conflict was resolved. Use Apply import or Cancel import.
+            </p>
           ) : (
-            <div className="space-y-4 pb-8">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium">Image</p>
-                <p className="text-xs text-muted-foreground">
-                  {currentChoice
-                    ? `Selected: ${currentChoice === "local" ? "current" : "imported"}`
-                    : "Pick a version with the actions above"}
-                </p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-1">
-                <div className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-3">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Current
-                  </p>
-                  {localUrl ? (
-                    // biome-ignore lint/performance/noImgElement: Blob preview URL from IndexedDB import review.
-                    <img
-                      src={localUrl}
-                      alt="Current version"
-                      className="max-h-64 w-full max-w-full rounded-md object-contain"
-                    />
-                  ) : null}
-                </div>
-                <div className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-3">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Imported
-                  </p>
-                  {incomingUrl ? (
-                    // biome-ignore lint/performance/noImgElement: Blob preview URL from backup import review.
-                    <img
-                      src={incomingUrl}
-                      alt="Imported version"
-                      className="max-h-64 w-full max-w-full rounded-md object-contain"
-                    />
-                  ) : null}
-                </div>
-              </div>
+            <div className="flex flex-col gap-6 pb-8">
+              {visibleConflicts.map((c) => {
+                const rowId = conflictStableRowId(c);
+                const requiredKeys = resolutionKeysForConflict(c);
+                const fullyResolved = requiredKeys.every((k) => choices.has(k));
+
+                if (c.kind === "image") {
+                  const imgKey = imageConflictResolutionKey(c);
+                  return (
+                    <ResolveCollapse
+                      key={rowId}
+                      resolved={fullyResolved}
+                      afterCollapsed={() => markRowDismissed(rowId)}
+                    >
+                      <article className="border-b border-border/35 pb-6 last:border-b-0 last:pb-0">
+                        <header className="mb-2 space-y-0.5">
+                          <h2 className="text-base font-semibold tracking-tight">
+                            Image {shortId(c.id)}
+                          </h2>
+                          <p className="font-mono text-[11px] text-muted-foreground break-all">
+                            {c.id}
+                          </p>
+                        </header>
+
+                        <HoverResolutionToolbar
+                          storageKey={imgKey}
+                          choice={choices.get(imgKey)}
+                          disabled={applying}
+                          onKeepCurrent={handleKeep}
+                          onAcceptIncoming={handleAccept}
+                        >
+                          <ImageBlobPair
+                            local={c.local}
+                            incoming={c.incoming}
+                          />
+                        </HoverResolutionToolbar>
+                      </article>
+                    </ResolveCollapse>
+                  );
+                }
+
+                const localTb = splitNoteTitleBody(c.local.content);
+                const incomingTb = splitNoteTitleBody(c.incoming.content);
+                const titlesDiffer = localTb.title !== incomingTb.title;
+                const bodiesDiffer = localTb.body !== incomingTb.body;
+                const needsFull = !titlesDiffer && !bodiesDiffer;
+                const titleKey = `note:${c.id}:title` as ResolutionKey;
+                const bodyKey = `note:${c.id}:body` as ResolutionKey;
+                const fullKey = `note:${c.id}:full` as ResolutionKey;
+
+                return (
+                  <ResolveCollapse
+                    key={rowId}
+                    resolved={fullyResolved}
+                    afterCollapsed={() => markRowDismissed(rowId)}
+                  >
+                    <article className="border-b border-border/35 pb-6 last:border-b-0 last:pb-0">
+                      <header className="mb-2 space-y-0.5">
+                        <h2 className="text-base font-semibold tracking-tight">
+                          Note {shortId(c.id)}
+                        </h2>
+                        <p className="font-mono text-[11px] text-muted-foreground break-all">
+                          {c.id}
+                        </p>
+                      </header>
+
+                      <div className="space-y-5">
+                        {needsFull ? (
+                          <section className="space-y-1.5">
+                            <h3 className="text-sm font-medium text-foreground">
+                              Note (metadata or other differences)
+                            </h3>
+                            <p className="text-[11px] text-muted-foreground">
+                              Text matches; pick which copy to keep (including
+                              timestamps).
+                            </p>
+                            <HoverResolutionToolbar
+                              storageKey={fullKey}
+                              choice={choices.get(fullKey)}
+                              disabled={applying}
+                              onKeepCurrent={handleKeep}
+                              onAcceptIncoming={handleAccept}
+                            >
+                              <UnifiedContentDiff
+                                before={c.local.content}
+                                after={c.incoming.content}
+                              />
+                            </HoverResolutionToolbar>
+                          </section>
+                        ) : (
+                          <>
+                            <section className="space-y-1.5">
+                              <h3 className="text-sm font-medium text-foreground">
+                                Note title
+                              </h3>
+                              {titlesDiffer ? (
+                                <HoverResolutionToolbar
+                                  storageKey={titleKey}
+                                  choice={choices.get(titleKey)}
+                                  disabled={applying}
+                                  onKeepCurrent={handleKeep}
+                                  onAcceptIncoming={handleAccept}
+                                >
+                                  <UnifiedContentDiff
+                                    plain
+                                    before={localTb.title}
+                                    after={incomingTb.title}
+                                  />
+                                </HoverResolutionToolbar>
+                              ) : (
+                                <div className="rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-sm text-foreground">
+                                  {localTb.title}
+                                </div>
+                              )}
+                            </section>
+
+                            <section className="space-y-1.5">
+                              <h3 className="text-sm font-medium text-foreground">
+                                Markdown body
+                              </h3>
+                              {bodiesDiffer ? (
+                                <HoverResolutionToolbar
+                                  storageKey={bodyKey}
+                                  choice={choices.get(bodyKey)}
+                                  disabled={applying}
+                                  onKeepCurrent={handleKeep}
+                                  onAcceptIncoming={handleAccept}
+                                >
+                                  <UnifiedContentDiff
+                                    before={localTb.body}
+                                    after={incomingTb.body}
+                                  />
+                                </HoverResolutionToolbar>
+                              ) : (
+                                <div className="rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
+                                  Same body as current note.
+                                </div>
+                              )}
+                            </section>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  </ResolveCollapse>
+                );
+              })}
             </div>
           )}
         </ScrollArea>
