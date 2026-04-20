@@ -13,7 +13,7 @@ import {
   toolbarPlugin,
   UndoRedo,
 } from "@mdxeditor/editor";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { AppSidebar } from "@/components/home/app-sidebar";
 import { HomeMenubar } from "@/components/home/menubar";
@@ -134,6 +134,15 @@ export default function Home() {
     reactToPrintFn();
   });
 
+  const reloadNotes = useCallback(async () => {
+    try {
+      const allNotes = await getAllNotes();
+      setNotes(allNotes);
+    } catch (error) {
+      console.error("Failed to reload notes:", error);
+    }
+  }, []);
+
   return (
     <SidebarProvider>
       <AppSidebar
@@ -145,13 +154,11 @@ export default function Home() {
       <SidebarInset>
         <header className="bg-background sticky top-0 flex shrink-0 items-center gap-2 border-b p-2">
           <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+          <Separator orientation="vertical" className="mr-2 self-stretch" />
           <HomeMenubar
             onCreateNote={handleCreateNote}
             onPrint={() => reactToPrintFn()}
+            onNotesReload={reloadNotes}
           />
         </header>
         <div className="relative flex flex-1 flex-col p-4" ref={contentRef}>

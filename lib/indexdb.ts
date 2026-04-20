@@ -300,6 +300,67 @@ export async function getAllNotes(): Promise<Note[]> {
   });
 }
 
+/**
+ * Upserts many notes in a single IndexedDB transaction (fast for large imports).
+ */
+export async function bulkUpsertNotes(notes: readonly Note[]): Promise<void> {
+  if (notes.length === 0) return;
+
+  return queue.add(async () => {
+    const db = await openDB();
+    const tx = db.transaction([STORE_NAME], "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    for (const note of notes) {
+      store.put(note);
+    }
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () =>
+        reject(tx.error ?? new Error("IndexedDB transaction failed"));
+      tx.onabort = () =>
+        reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+    });
+  });
+}
+
+export type StoredImageWrite = {
+  id: string;
+  blob: Blob;
+  createdAt: Date;
+};
+
+/**
+ * Upserts notes and images in one IndexedDB transaction.
+ */
+export async function bulkUpsertNotesAndImages(
+  notes: readonly Note[],
+  images: readonly StoredImageWrite[],
+): Promise<void> {
+  if (notes.length === 0 && images.length === 0) return;
+
+  return queue.add(async () => {
+    const db = await openDB();
+    const tx = db.transaction([STORE_NAME, IMAGES_STORE_NAME], "readwrite");
+    const noteStore = tx.objectStore(STORE_NAME);
+    const imageStore = tx.objectStore(IMAGES_STORE_NAME);
+    for (const note of notes) noteStore.put(note);
+    for (const image of images) {
+      imageStore.put({
+        id: image.id,
+        blob: image.blob,
+        createdAt: image.createdAt,
+      } satisfies StoredImage);
+    }
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () =>
+        reject(tx.error ?? new Error("IndexedDB transaction failed"));
+      tx.onabort = () =>
+        reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+    });
+  });
+}
+
 // Close DB on app unload (optional, for cleanup)
 if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
