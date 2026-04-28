@@ -1,9 +1,15 @@
 "use client";
 
-import DiffMatchPatch from "diff-match-patch";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Markdown, { type Components } from "react-markdown";
-import rehypeRaw from "rehype-raw";
+import { UnresolvedFile } from "@pierre/diffs/react";
+import { useTheme } from "next-themes";
+import {
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -15,19 +21,18 @@ import {
 } from "@/components/ui/sheet";
 import {
   conflictStableRowId,
+  type ImportConflictResolution,
   type ImportDryRun,
   imageConflictResolutionKey,
   type ResolutionKey,
   resolutionKeysForConflict,
 } from "@/lib/backup";
+import { buildFieldMergeConflictFile } from "@/lib/merge-conflict-synth";
 import { cn, splitNoteTitleBody } from "@/lib/utils";
 
-/** diff-match-patch uses -1 / 0 / 1; avoid named imports from this CJS package (they can be undefined at runtime under ESM). */
-const DMP_DIFF_DELETE = -1;
-const DMP_DIFF_EQUAL = 0;
-const DMP_DIFF_INSERT = 1;
-
-const dmpSingleton = new DiffMatchPatch();
+type UnresolvedFileOptions = NonNullable<
+  ComponentProps<typeof UnresolvedFile>["options"]
+>;
 
 /** Grid row collapse + opacity; pair with inner `min-h-0 overflow-hidden`. */
 const RESOLVE_OUT_BASE =
@@ -78,54 +83,7 @@ function shortId(id: string): string {
   return `${id.slice(0, 8)}…`;
 }
 
-/** Compact markdown inside diff rows; HTML (e.g. &lt;img&gt;) via rehype-raw. */
-const diffMarkdownComponents: Partial<Components> = {
-  p: (props) => <p className="mb-1.5 last:mb-0 leading-snug" {...props} />,
-  h1: (props) => (
-    <h1 className="mt-2 mb-1 text-lg font-semibold first:mt-0" {...props} />
-  ),
-  h2: (props) => (
-    <h2 className="mt-2 mb-1 text-base font-semibold first:mt-0" {...props} />
-  ),
-  h3: (props) => (
-    <h3 className="mt-1.5 mb-1 text-sm font-semibold first:mt-0" {...props} />
-  ),
-  ul: (props) => <ul className="ml-4 list-disc space-y-0.5" {...props} />,
-  ol: (props) => <ol className="ml-4 list-decimal space-y-0.5" {...props} />,
-  li: (props) => <li className="leading-snug" {...props} />,
-  strong: (props) => <strong className="font-semibold" {...props} />,
-  blockquote: (props) => (
-    <blockquote
-      className="border-l-2 border-foreground/20 py-0.5 pl-2 text-muted-foreground"
-      {...props}
-    />
-  ),
-  code: (props) => (
-    <code
-      className="rounded bg-foreground/10 px-1 py-px font-mono text-[12px]"
-      {...props}
-    />
-  ),
-  pre: (props) => (
-    <pre
-      className="my-1 max-h-48 overflow-auto rounded bg-foreground/10 p-2 text-[12px] leading-snug"
-      {...props}
-    />
-  ),
-  a: (props) => (
-    <a className="text-primary underline underline-offset-2" {...props} />
-  ),
-  img: (props) => (
-    // biome-ignore lint/performance/noImgElement: Blob / img- URLs in user markdown; constrained for layout.
-    <img
-      {...props}
-      alt={props.alt ?? ""}
-      className="my-1 mx-auto block max-h-36 w-full max-w-[min(100%,24rem)] rounded-md border border-border/50 object-contain"
-    />
-  ),
-};
-
-function HoverResolutionToolbar({
+function BinaryChoicePanel({
   storageKey,
   choice,
   disabled,
@@ -134,13 +92,13 @@ function HoverResolutionToolbar({
   children,
 }: {
   storageKey: ResolutionKey;
-  choice: "local" | "incoming" | undefined;
+  choice: ImportConflictResolution | undefined;
   disabled: boolean;
   onKeepCurrent: (key: ResolutionKey) => void;
   onAcceptIncoming: (key: ResolutionKey) => void;
   children: React.ReactNode;
 }) {
-  const resolved = choice !== undefined;
+  const resolved = choice === "local" || choice === "incoming";
 
   return (
     <ResolveCollapse resolved={resolved}>
@@ -148,126 +106,59 @@ function HoverResolutionToolbar({
         {children}
         <div
           className={cn(
-            "absolute top-1 right-1 z-20 flex gap-1 transition-opacity duration-150",
-            "pointer-events-none opacity-0",
-            "group-hover/diffhover:pointer-events-auto group-hover/diffhover:opacity-100",
+            "absolute top-1.5 right-1.5 z-20 flex gap-1 transition-all duration-150",
+            "pointer-events-none opacity-0 translate-y-0.5",
+            "group-hover/diffhover:pointer-events-auto group-hover/diffhover:opacity-100 group-hover/diffhover:translate-y-0",
           )}
         >
-          <div className="flex gap-1 rounded-md border border-border/60 bg-popover/95 p-0.5 shadow-md backdrop-blur-md">
+          <div className="flex gap-1 rounded-lg border border-border/50 bg-popover/90 p-1 shadow-lg backdrop-blur-xl">
             <Button
               type="button"
               size="sm"
               disabled={disabled}
               className={cn(
-                "h-7 border border-red-700/35 bg-red-600 px-2 text-xs text-white shadow-sm hover:bg-red-600/90",
+                "h-6 rounded-md border border-red-700/30 bg-red-600/90 px-2.5 text-[11px] font-medium text-white shadow-sm hover:bg-red-500",
                 "focus-visible:ring-2 focus-visible:ring-red-400/80",
                 choice === "local" &&
                   "ring-2 ring-red-300 ring-offset-1 ring-offset-background",
               )}
               onClick={() => onKeepCurrent(storageKey)}
             >
-              Keep current
+              Keep
             </Button>
             <Button
               type="button"
               size="sm"
               disabled={disabled}
               className={cn(
-                "h-7 border border-emerald-700/35 bg-emerald-600 px-2 text-xs text-white shadow-sm hover:bg-emerald-600/90",
+                "h-6 rounded-md border border-emerald-700/30 bg-emerald-600/90 px-2.5 text-[11px] font-medium text-white shadow-sm hover:bg-emerald-500",
                 "focus-visible:ring-2 focus-visible:ring-emerald-400/80",
                 choice === "incoming" &&
                   "ring-2 ring-emerald-300 ring-offset-1 ring-offset-background",
               )}
               onClick={() => onAcceptIncoming(storageKey)}
             >
-              Accept incoming
+              Accept
             </Button>
           </div>
         </div>
+        {/* Persistent hover hint when unresolved */}
+        {choice === undefined && (
+          <div
+            className={cn(
+              "absolute bottom-1.5 right-1.5 z-10 transition-opacity duration-150",
+              "group-hover/diffhover:opacity-0 pointer-events-none",
+            )}
+          >
+            <span className="rounded-md border border-border/30 bg-background/60 px-1.5 py-0.5 text-[9px] text-muted-foreground/50 backdrop-blur-sm">
+              hover to resolve
+            </span>
+          </div>
+        )}
       </div>
     </ResolveCollapse>
   );
 }
-
-const UnifiedContentDiff = memo(function UnifiedContentDiff({
-  before,
-  after,
-  plain = false,
-}: {
-  before: string;
-  after: string;
-  plain?: boolean;
-}) {
-  const segments = useMemo(() => {
-    const raw = dmpSingleton.diff_main(before, after);
-    dmpSingleton.diff_cleanupSemantic(raw);
-    return raw;
-  }, [before, after]);
-
-  const renderBody = (text: string) =>
-    plain ? (
-      <span className="whitespace-pre-wrap break-words">{text}</span>
-    ) : (
-      <Markdown
-        components={diffMarkdownComponents}
-        rehypePlugins={[rehypeRaw]}
-        urlTransform={(u) => u}
-      >
-        {text}
-      </Markdown>
-    );
-
-  return (
-    <div className="max-w-full overflow-hidden rounded-md border border-border/60 bg-muted/40 text-sm leading-snug dark:bg-zinc-950/40">
-      {segments.map(([op, text], i) => {
-        if (!text) return null;
-
-        if (op === DMP_DIFF_EQUAL) {
-          return (
-            <div
-              key={`${i}-${text.length}`}
-              className="border-l-4 border-transparent px-2 py-0.5 text-foreground"
-            >
-              <div className="min-w-0 max-w-full overflow-x-auto pr-1 [&_img]:max-h-32">
-                {renderBody(text)}
-              </div>
-            </div>
-          );
-        }
-
-        const isInsert = op === DMP_DIFF_INSERT;
-        const isDelete = op === DMP_DIFF_DELETE;
-        if (!isInsert && !isDelete) return null;
-        const gutter = isInsert ? "+" : "−";
-        const rowClass = isInsert
-          ? "border-l-4 border-emerald-500 bg-emerald-500/18 text-emerald-950 dark:border-emerald-400 dark:bg-emerald-950/55 dark:text-emerald-50"
-          : "border-l-4 border-red-500 bg-red-500/18 text-red-950 dark:border-red-400 dark:bg-red-950/55 dark:text-red-50";
-
-        return (
-          <div
-            key={`${i}-${text.length}`}
-            className={cn("flex gap-1.5 px-1.5 py-0.5", rowClass)}
-          >
-            <div
-              className={cn(
-                "w-5 shrink-0 select-none pt-px text-center text-[11px] font-bold tabular-nums leading-none",
-                isInsert
-                  ? "text-emerald-700 dark:text-emerald-200"
-                  : "text-red-700 dark:text-red-200",
-              )}
-              aria-hidden
-            >
-              {gutter}
-            </div>
-            <div className="min-w-0 max-w-full flex-1 overflow-x-auto pr-1 [&_img]:max-h-32">
-              {renderBody(text)}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-});
 
 function ImageBlobPair({ local, incoming }: { local: Blob; incoming: Blob }) {
   const [urls, setUrls] = useState<[string, string] | null>(null);
@@ -318,7 +209,7 @@ export type ImportConflictSheetProps = {
   applying?: boolean;
   onCancel: () => void;
   onApply: (
-    choices: Map<ResolutionKey, "local" | "incoming">,
+    choices: Map<ResolutionKey, ImportConflictResolution>,
   ) => void | Promise<void>;
 };
 
@@ -330,9 +221,10 @@ export function ImportConflictSheet({
   onCancel,
   onApply,
 }: ImportConflictSheetProps) {
+  const { resolvedTheme, theme } = useTheme();
   const { conflicts } = dryRun;
   const [choices, setChoices] = useState<
-    Map<ResolutionKey, "local" | "incoming">
+    Map<ResolutionKey, ImportConflictResolution>
   >(() => new Map());
   const [dismissedRowIds, setDismissedRowIds] = useState(
     () => new Set<string>(),
@@ -385,7 +277,7 @@ export function ImportConflictSheet({
   );
 
   const pickChoice = useCallback(
-    (key: ResolutionKey, choice: "local" | "incoming") => {
+    (key: ResolutionKey, choice: ImportConflictResolution) => {
       setChoices((prev) => {
         const next = new Map(prev);
         next.set(key, choice);
@@ -412,10 +304,11 @@ export function ImportConflictSheet({
     (key: ResolutionKey) => pickChoice(key, "incoming"),
     [pickChoice],
   );
-
   const handleApply = useCallback(() => {
     void onApply(choices);
   }, [choices, onApply]);
+  const diffsTheme =
+    (resolvedTheme ?? theme) === "dark" ? "pierre-dark" : "pierre-light";
 
   const handleResizePointerDown = useCallback(
     (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -452,16 +345,32 @@ export function ImportConflictSheet({
         />
 
         <SheetHeader className="shrink-0 gap-3 border-b border-border/40 bg-popover/40 px-4 py-3 pl-5 backdrop-blur-md">
-          <div className="flex flex-wrap items-start justify-between gap-3 pr-8">
-            <div className="min-w-0 space-y-1">
-              <SheetTitle>Review import conflicts</SheetTitle>
-              <p className="text-xs text-muted-foreground">
-                {visibleConflicts.length === 0 && conflicts.length > 0
-                  ? "Every conflict is resolved. Apply import or cancel when ready."
-                  : `${visibleConflicts.length} change${visibleConflicts.length === 1 ? "" : "s"} to review. Hover a diff to choose keep current or accept incoming.`}
-              </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 pr-8">
+            <div className="min-w-0 space-y-0.5">
+              <SheetTitle>Import conflicts</SheetTitle>
+              <div className="flex items-center gap-2">
+                {conflicts.length > 0 && (
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                      allResolved
+                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                        : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                    )}
+                  >
+                    {allResolved
+                      ? "All resolved"
+                      : `${visibleConflicts.length} remaining`}
+                  </span>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {allResolved
+                    ? "Ready to apply."
+                    : "Resolve each change block to continue."}
+                </p>
+              </div>
             </div>
-            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <Button
                 type="button"
                 variant="glass"
@@ -471,7 +380,7 @@ export function ImportConflictSheet({
                   onCancel();
                 }}
               >
-                Cancel import
+                Cancel
               </Button>
               <Button
                 type="button"
@@ -480,10 +389,25 @@ export function ImportConflictSheet({
                 disabled={!allResolved || applying}
                 onClick={handleApply}
               >
-                {applying ? "Applying…" : "Apply import"}
+                {applying ? "Applying…" : "Apply"}
               </Button>
             </div>
           </div>
+          {/* Progress bar */}
+          {conflicts.length > 0 && (
+            <div className="h-px w-full overflow-hidden rounded-full bg-border/40">
+              <div
+                className="h-full bg-emerald-500/70 transition-all duration-500 ease-out"
+                style={{
+                  width: `${
+                    ((conflicts.length - visibleConflicts.length) /
+                      conflicts.length) *
+                    100
+                  }%`,
+                }}
+              />
+            </div>
+          )}
           <SheetDescription className="sr-only">
             Scroll through each conflicting note or image. Resolve each
             differing title, body, or whole note, and each image. Drag the left
@@ -501,7 +425,7 @@ export function ImportConflictSheet({
               Every conflict was resolved. Use Apply import or Cancel import.
             </p>
           ) : (
-            <div className="flex flex-col gap-6 pb-8">
+            <div className="flex flex-col gap-3 pb-8">
               {visibleConflicts.map((c) => {
                 const rowId = conflictStableRowId(c);
                 const requiredKeys = resolutionKeysForConflict(c);
@@ -515,17 +439,22 @@ export function ImportConflictSheet({
                       resolved={fullyResolved}
                       afterCollapsed={() => markRowDismissed(rowId)}
                     >
-                      <article className="border-b border-border/35 pb-6 last:border-b-0 last:pb-0">
-                        <header className="mb-2 space-y-0.5">
-                          <h2 className="text-base font-semibold tracking-tight">
-                            Image {shortId(c.id)}
-                          </h2>
-                          <p className="font-mono text-[11px] text-muted-foreground break-all">
-                            {c.id}
-                          </p>
+                      <article className="rounded-xl border border-border/40 bg-muted/10 p-4 backdrop-blur-sm">
+                        <header className="mb-3 flex items-start justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <h2 className="text-sm font-semibold tracking-tight">
+                              Image — {shortId(c.id)}
+                            </h2>
+                            <p className="font-mono text-[10px] text-muted-foreground/60 break-all">
+                              {c.id}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-md border border-border/40 bg-background/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            {c.kind}
+                          </span>
                         </header>
 
-                        <HoverResolutionToolbar
+                        <BinaryChoicePanel
                           storageKey={imgKey}
                           choice={choices.get(imgKey)}
                           disabled={applying}
@@ -536,7 +465,7 @@ export function ImportConflictSheet({
                             local={c.local}
                             incoming={c.incoming}
                           />
-                        </HoverResolutionToolbar>
+                        </BinaryChoicePanel>
                       </article>
                     </ResolveCollapse>
                   );
@@ -550,6 +479,14 @@ export function ImportConflictSheet({
                 const titleKey = `note:${c.id}:title` as ResolutionKey;
                 const bodyKey = `note:${c.id}:body` as ResolutionKey;
                 const fullKey = `note:${c.id}:full` as ResolutionKey;
+                const titleMergeOptions: UnresolvedFileOptions = {
+                  theme: diffsTheme,
+                  mergeConflictActionsType: "none",
+                };
+                const bodyMergeOptions: UnresolvedFileOptions = {
+                  theme: diffsTheme,
+                  mergeConflictActionsType: "none",
+                };
 
                 return (
                   <ResolveCollapse
@@ -557,14 +494,19 @@ export function ImportConflictSheet({
                     resolved={fullyResolved}
                     afterCollapsed={() => markRowDismissed(rowId)}
                   >
-                    <article className="border-b border-border/35 pb-6 last:border-b-0 last:pb-0">
-                      <header className="mb-2 space-y-0.5">
-                        <h2 className="text-base font-semibold tracking-tight">
-                          Note {shortId(c.id)}
-                        </h2>
-                        <p className="font-mono text-[11px] text-muted-foreground break-all">
-                          {c.id}
-                        </p>
+                    <article className="rounded-xl border border-border/40 bg-muted/10 p-4 backdrop-blur-sm">
+                      <header className="mb-3 flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <h2 className="text-sm font-semibold tracking-tight">
+                            Note — {shortId(c.id)}
+                          </h2>
+                          <p className="font-mono text-[10px] text-muted-foreground/60 break-all">
+                            {c.id}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-md border border-border/40 bg-background/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          {c.kind}
+                        </span>
                       </header>
 
                       <div className="space-y-5">
@@ -577,39 +519,47 @@ export function ImportConflictSheet({
                               Text matches; pick which copy to keep (including
                               timestamps).
                             </p>
-                            <HoverResolutionToolbar
+                            <BinaryChoicePanel
                               storageKey={fullKey}
                               choice={choices.get(fullKey)}
                               disabled={applying}
                               onKeepCurrent={handleKeep}
                               onAcceptIncoming={handleAccept}
                             >
-                              <UnifiedContentDiff
-                                before={c.local.content}
-                                after={c.incoming.content}
-                              />
-                            </HoverResolutionToolbar>
+                              <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                                Use Keep for the local note metadata or Accept
+                                for the imported metadata.
+                              </div>
+                            </BinaryChoicePanel>
                           </section>
                         ) : (
                           <>
                             <section className="space-y-1.5">
-                              <h3 className="text-sm font-medium text-foreground">
-                                Note title
+                              <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                <span className="inline-block h-px w-3 bg-border" />
+                                Title
                               </h3>
                               {titlesDiffer ? (
-                                <HoverResolutionToolbar
+                                <BinaryChoicePanel
                                   storageKey={titleKey}
                                   choice={choices.get(titleKey)}
                                   disabled={applying}
                                   onKeepCurrent={handleKeep}
                                   onAcceptIncoming={handleAccept}
                                 >
-                                  <UnifiedContentDiff
-                                    plain
-                                    before={localTb.title}
-                                    after={incomingTb.title}
-                                  />
-                                </HoverResolutionToolbar>
+                                  <div className="overflow-hidden rounded-lg border border-border/50 bg-muted/20 p-2">
+                                    {/* UnresolvedFile merge-conflict APIs are still in beta per Diffs docs. */}
+                                    <UnresolvedFile
+                                      key={`${open}-${c.id}-title-${localTb.title.length}-${incomingTb.title.length}`}
+                                      file={buildFieldMergeConflictFile(
+                                        localTb.title,
+                                        incomingTb.title,
+                                        "note-title.md",
+                                      )}
+                                      options={titleMergeOptions}
+                                    />
+                                  </div>
+                                </BinaryChoicePanel>
                               ) : (
                                 <div className="rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-sm text-foreground">
                                   {localTb.title}
@@ -618,22 +568,31 @@ export function ImportConflictSheet({
                             </section>
 
                             <section className="space-y-1.5">
-                              <h3 className="text-sm font-medium text-foreground">
-                                Markdown body
+                              <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                <span className="inline-block h-px w-3 bg-border" />
+                                Body
                               </h3>
                               {bodiesDiffer ? (
-                                <HoverResolutionToolbar
+                                <BinaryChoicePanel
                                   storageKey={bodyKey}
                                   choice={choices.get(bodyKey)}
                                   disabled={applying}
                                   onKeepCurrent={handleKeep}
                                   onAcceptIncoming={handleAccept}
                                 >
-                                  <UnifiedContentDiff
-                                    before={localTb.body}
-                                    after={incomingTb.body}
-                                  />
-                                </HoverResolutionToolbar>
+                                  <div className="overflow-hidden rounded-lg border border-border/50 bg-muted/20 p-2">
+                                    {/* UnresolvedFile merge-conflict APIs are still in beta per Diffs docs. */}
+                                    <UnresolvedFile
+                                      key={`${open}-${c.id}-body-${localTb.body.length}-${incomingTb.body.length}`}
+                                      file={buildFieldMergeConflictFile(
+                                        localTb.body,
+                                        incomingTb.body,
+                                        "note-body.md",
+                                      )}
+                                      options={bodyMergeOptions}
+                                    />
+                                  </div>
+                                </BinaryChoicePanel>
                               ) : (
                                 <div className="rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
                                   Same body as current note.

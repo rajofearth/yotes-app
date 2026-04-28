@@ -137,7 +137,7 @@ export default function Home() {
   const reloadNotes = useCallback(async () => {
     try {
       const allNotes = await getAllNotes();
-      setNotes(allNotes);
+      setNotes(allNotes);w
     } catch (error) {
       console.error("Failed to reload notes:", error);
     }

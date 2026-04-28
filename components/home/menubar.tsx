@@ -1,6 +1,16 @@
 "use client";
 
-import { CloudCheck, Keyboard, LogOut, SunMoon, User } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  CloudCheck,
+  Info,
+  Keyboard,
+  LogOut,
+  SunMoon,
+  Upload,
+  User,
+} from "lucide-react";
 import { useCallback, useId, useRef, useState } from "react";
 import { ImportConflictSheet } from "@/components/import-conflict-sheet";
 import { KeybindingsDialog } from "@/components/keybindings-dialog";
@@ -33,6 +43,7 @@ import {
   applyImportChoices,
   buildImportDryRun,
   downloadNotesBackup,
+  type ImportConflictResolution,
   type ImportDryRun,
   parseNotesBackup,
   type ResolutionKey,
@@ -40,6 +51,7 @@ import {
 } from "@/lib/backup";
 import { bulkUpsertNotesAndImages, getAllNotes, getImage } from "@/lib/indexdb";
 import type { Note } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface HomeMenubarProps {
   onCreateNote?: () => void;
@@ -83,10 +95,10 @@ export function HomeMenubar({
 
   const handleImportFile = useCallback(
     async (file: File | undefined) => {
+      if (!file) return;
       setImportError(null);
       setLastImportSummary(null);
       resetConflictFlow();
-      if (!file) return;
 
       setImportBusy(true);
       try {
@@ -120,7 +132,7 @@ export function HomeMenubar({
   );
 
   const handleConflictApply = useCallback(
-    async (choices: Map<ResolutionKey, "local" | "incoming">) => {
+    async (choices: Map<ResolutionKey, ImportConflictResolution>) => {
       if (!conflictDryRun) return;
       setApplyBusy(true);
       try {
@@ -278,47 +290,90 @@ export function HomeMenubar({
         />
       ) : null}
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-        <DialogContent className="sm:max-w-md" showCloseButton>
-          <DialogHeader>
-            <DialogTitle>Profile</DialogTitle>
-            <DialogDescription>
-              Pick a backup JSON file. If a note or embedded image already
-              exists with different data, a translucent sheet opens: drag its
-              left edge to resize, then resolve each conflict from the top
-              toolbar.
+        <DialogContent
+          className="sm:max-w-md backdrop-blur-md bg-background/60 border-border/50 shadow-2xl"
+          showCloseButton
+        >
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-base font-semibold tracking-tight">
+              Import Backup
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+              Select a JSON backup file. Conflicts with existing notes or
+              embedded images will be resolved individually.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-1">
-            <div className="grid gap-2">
-              <Label htmlFor={fileInputId}>Backup file</Label>
-              <input
-                id={fileInputId}
-                ref={fileInputRef}
-                type="file"
-                accept="application/json,.json"
-                className="text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-2 file:py-1 file:text-xs"
-                disabled={importBusy}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  void handleImportFile(file);
-                }}
-              />
+
+          <div className="py-2 space-y-4">
+            {/* File picker area */}
+            <div className="space-y-1.5">
+              <Label
+                htmlFor={fileInputId}
+                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
+                Backup file
+              </Label>
+              <label
+                htmlFor={fileInputId}
+                className={cn(
+                  "group flex items-center gap-3 rounded-lg border border-dashed border-input/40 px-4 py-3.5 cursor-pointer transition-all",
+                  "hover:border-input hover:bg-muted/20",
+                  importBusy && "pointer-events-none opacity-40",
+                )}
+              >
+                <Upload className="h-4 w-4 shrink-0 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors truncate">
+                    Choose a file…
+                  </span>
+                  <span className="text-xs text-muted-foreground/50">
+                    .json
+                  </span>
+                </div>
+                <ChevronRight className="h-3.5 w-3.5 ml-auto shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
+                <input
+                  id={fileInputId}
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="sr-only"
+                  disabled={importBusy}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    void handleImportFile(file);
+                  }}
+                />
+              </label>
             </div>
-            {importError ? (
-              <p className="text-sm text-destructive">{importError}</p>
-            ) : null}
-            {lastImportSummary ? (
-              <p className="text-sm text-muted-foreground">
-                {lastImportSummary}
-              </p>
-            ) : null}
+
+            {/* Status messages */}
+            {importError && (
+              <div className="flex items-center gap-2 px-1 py-0.5">
+                <AlertTriangle className="h-3 w-3 shrink-0 text-destructive/70" />
+                <p className="text-xs text-destructive/80 leading-relaxed">
+                  {importError}
+                </p>
+              </div>
+            )}
+
+            {lastImportSummary && !importError && (
+              <div className="flex items-start gap-2 rounded-md bg-muted/50 border border-border px-3 py-2">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {lastImportSummary}
+                </p>
+              </div>
+            )}
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => setProfileOpen(false)}
               disabled={importBusy}
+              className="w-full sm:w-auto"
             >
               Close
             </Button>
