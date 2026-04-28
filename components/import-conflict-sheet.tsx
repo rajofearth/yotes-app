@@ -1,6 +1,5 @@
 "use client";
 
-import { UnresolvedFile } from "@pierre/diffs/react";
 import { useTheme } from "next-themes";
 import {
   type ComponentProps,
@@ -10,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { AcceptRejectDiff } from "@/components/accept-reject-diff";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -27,12 +27,7 @@ import {
   type ResolutionKey,
   resolutionKeysForConflict,
 } from "@/lib/backup";
-import { buildFieldMergeConflictFile } from "@/lib/merge-conflict-synth";
 import { cn, splitNoteTitleBody } from "@/lib/utils";
-
-type UnresolvedFileOptions = NonNullable<
-  ComponentProps<typeof UnresolvedFile>["options"]
->;
 
 /** Grid row collapse + opacity; pair with inner `min-h-0 overflow-hidden`. */
 const RESOLVE_OUT_BASE =
@@ -87,6 +82,7 @@ function BinaryChoicePanel({
   storageKey,
   choice,
   disabled,
+  hideButtons = false,
   onKeepCurrent,
   onAcceptIncoming,
   children,
@@ -94,6 +90,7 @@ function BinaryChoicePanel({
   storageKey: ResolutionKey;
   choice: ImportConflictResolution | undefined;
   disabled: boolean;
+  hideButtons?: boolean;
   onKeepCurrent: (key: ResolutionKey) => void;
   onAcceptIncoming: (key: ResolutionKey) => void;
   children: React.ReactNode;
@@ -104,46 +101,48 @@ function BinaryChoicePanel({
     <ResolveCollapse resolved={resolved}>
       <div className="group/diffhover relative min-h-9 rounded-lg">
         {children}
-        <div
-          className={cn(
-            "absolute top-1.5 right-1.5 z-20 flex gap-1 transition-all duration-150",
-            "pointer-events-none opacity-0 translate-y-0.5",
-            "group-hover/diffhover:pointer-events-auto group-hover/diffhover:opacity-100 group-hover/diffhover:translate-y-0",
-          )}
-        >
-          <div className="flex gap-1 rounded-lg border border-border/50 bg-popover/90 p-1 shadow-lg backdrop-blur-xl">
-            <Button
-              type="button"
-              size="sm"
-              disabled={disabled}
-              className={cn(
-                "h-6 rounded-md border border-red-700/30 bg-red-600/90 px-2.5 text-[11px] font-medium text-white shadow-sm hover:bg-red-500",
-                "focus-visible:ring-2 focus-visible:ring-red-400/80",
-                choice === "local" &&
-                  "ring-2 ring-red-300 ring-offset-1 ring-offset-background",
-              )}
-              onClick={() => onKeepCurrent(storageKey)}
-            >
-              Keep
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={disabled}
-              className={cn(
-                "h-6 rounded-md border border-emerald-700/30 bg-emerald-600/90 px-2.5 text-[11px] font-medium text-white shadow-sm hover:bg-emerald-500",
-                "focus-visible:ring-2 focus-visible:ring-emerald-400/80",
-                choice === "incoming" &&
-                  "ring-2 ring-emerald-300 ring-offset-1 ring-offset-background",
-              )}
-              onClick={() => onAcceptIncoming(storageKey)}
-            >
-              Accept
-            </Button>
+        {!hideButtons && (
+          <div
+            className={cn(
+              "absolute top-1.5 right-1.5 z-20 flex gap-1 transition-all duration-150",
+              "pointer-events-none opacity-0 translate-y-0.5",
+              "group-hover/diffhover:pointer-events-auto group-hover/diffhover:opacity-100 group-hover/diffhover:translate-y-0",
+            )}
+          >
+            <div className="flex gap-1 rounded-lg border border-border/50 bg-popover/90 p-1 shadow-lg backdrop-blur-xl">
+              <Button
+                type="button"
+                size="sm"
+                disabled={disabled}
+                className={cn(
+                  "h-6 rounded-md border border-red-700/30 bg-red-600/90 px-2.5 text-[11px] font-medium text-white shadow-sm hover:bg-red-500",
+                  "focus-visible:ring-2 focus-visible:ring-red-400/80",
+                  choice === "local" &&
+                    "ring-2 ring-red-300 ring-offset-1 ring-offset-background",
+                )}
+                onClick={() => onKeepCurrent(storageKey)}
+              >
+                Keep
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={disabled}
+                className={cn(
+                  "h-6 rounded-md border border-emerald-700/30 bg-emerald-600/90 px-2.5 text-[11px] font-medium text-white shadow-sm hover:bg-emerald-500",
+                  "focus-visible:ring-2 focus-visible:ring-emerald-400/80",
+                  choice === "incoming" &&
+                    "ring-2 ring-emerald-300 ring-offset-1 ring-offset-background",
+                )}
+                onClick={() => onAcceptIncoming(storageKey)}
+              >
+                Accept
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
         {/* Persistent hover hint when unresolved */}
-        {choice === undefined && (
+        {choice === undefined && !hideButtons && (
           <div
             className={cn(
               "absolute bottom-1.5 right-1.5 z-10 transition-opacity duration-150",
@@ -479,14 +478,6 @@ export function ImportConflictSheet({
                 const titleKey = `note:${c.id}:title` as ResolutionKey;
                 const bodyKey = `note:${c.id}:body` as ResolutionKey;
                 const fullKey = `note:${c.id}:full` as ResolutionKey;
-                const titleMergeOptions: UnresolvedFileOptions = {
-                  theme: diffsTheme,
-                  mergeConflictActionsType: "none",
-                };
-                const bodyMergeOptions: UnresolvedFileOptions = {
-                  theme: diffsTheme,
-                  mergeConflictActionsType: "none",
-                };
 
                 return (
                   <ResolveCollapse
@@ -544,21 +535,18 @@ export function ImportConflictSheet({
                                   storageKey={titleKey}
                                   choice={choices.get(titleKey)}
                                   disabled={applying}
+                                  hideButtons={true}
                                   onKeepCurrent={handleKeep}
                                   onAcceptIncoming={handleAccept}
                                 >
-                                  <div className="overflow-hidden rounded-lg border border-border/50 bg-muted/20 p-2">
-                                    {/* UnresolvedFile merge-conflict APIs are still in beta per Diffs docs. */}
-                                    <UnresolvedFile
-                                      key={`${open}-${c.id}-title-${localTb.title.length}-${incomingTb.title.length}`}
-                                      file={buildFieldMergeConflictFile(
-                                        localTb.title,
-                                        incomingTb.title,
-                                        "note-title.md",
-                                      )}
-                                      options={titleMergeOptions}
-                                    />
-                                  </div>
+                                  <AcceptRejectDiff
+                                    localContent={localTb.title}
+                                    incomingContent={incomingTb.title}
+                                    fileName="title.md"
+                                    onKeep={() => handleKeep(titleKey)}
+                                    onAccept={() => handleAccept(titleKey)}
+                                    theme={diffsTheme === "pierre-dark" ? "pierre-dark" : "pierre-light"}
+                                  />
                                 </BinaryChoicePanel>
                               ) : (
                                 <div className="rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-sm text-foreground">
@@ -577,21 +565,18 @@ export function ImportConflictSheet({
                                   storageKey={bodyKey}
                                   choice={choices.get(bodyKey)}
                                   disabled={applying}
+                                  hideButtons={true}
                                   onKeepCurrent={handleKeep}
                                   onAcceptIncoming={handleAccept}
                                 >
-                                  <div className="overflow-hidden rounded-lg border border-border/50 bg-muted/20 p-2">
-                                    {/* UnresolvedFile merge-conflict APIs are still in beta per Diffs docs. */}
-                                    <UnresolvedFile
-                                      key={`${open}-${c.id}-body-${localTb.body.length}-${incomingTb.body.length}`}
-                                      file={buildFieldMergeConflictFile(
-                                        localTb.body,
-                                        incomingTb.body,
-                                        "note-body.md",
-                                      )}
-                                      options={bodyMergeOptions}
-                                    />
-                                  </div>
+                                  <AcceptRejectDiff
+                                    localContent={localTb.body}
+                                    incomingContent={incomingTb.body}
+                                    fileName="body.md"
+                                    onKeep={() => handleKeep(bodyKey)}
+                                    onAccept={() => handleAccept(bodyKey)}
+                                    theme={diffsTheme === "pierre-dark" ? "pierre-dark" : "pierre-light"}
+                                  />
                                 </BinaryChoicePanel>
                               ) : (
                                 <div className="rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
